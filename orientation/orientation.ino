@@ -9,13 +9,27 @@
 
 OrientationSensor orientationSensor = OrientationSensor();
 
-const byte STATE_WAITING = 0x00;
-const byte STATE_INIT = 0x01;
-const byte STATE_CALIBRATING_COMPASS = 0x02;
-const byte STATE_ORIENTATION_UPDATE = 0x03;
+/**
+ * Controller will start in the WAITING state. In this state the sensor is NOT initialized or calibrated.
+ * Controller should be requested to move to INIT state (via I2C). In this state the sensor will initialize and calibrate Accel and Gyros.
+ *      The sensor should NOT be physically moved in the INIT state as the Gyro and Accel sensors are calibrating.
+ *      After Accel and Gyro calibration, the Controller will move to the MAG_CALIBRATING state.
+ * Controller will be moved to MAG_CALIBRATING state. In this state the sensor cannot be changed and will be calibrating the mag.
+ *      The sensor should be physically moved so the mag can calibrate.
+ *      After calibration in complete, the Controller will move to the UPDATING state.
+ * Controller will be moved to the UPDATING state. In this state the sensor will be continuously updating Roll, Pitch, and Yaw.
+ */
 
+const byte STATE_WAITING = 0x45;
+const byte STATE_INIT = 0x46;
+const byte STATE_MAG_CALIBRATING = 0x47;
+const byte STATE_UPDATING = 0x48;
 
 byte state = STATE_WAITING;
+
+char yawBuffer [8];
+char pitchBuffer [8];
+char rollBuffer [8];
 
 void setup() {
     Serial.begin(9600);
@@ -23,69 +37,60 @@ void setup() {
     Wire.onReceive(onReceive);
     Wire.onRequest(onRequest);
 
-
     // Setup Orientation Sensor
-    // @TODO: Add compass sensor and move to I2C init request
-    orientationSensor.setSerialDebug(true);
-    orientationSensor.setDeclination(13.63);
+    // orientationSensor.serialDebug = true;
 }
 
 void onReceive(int count) {
-    Serial.println("DID RECEIVE");
-    // Master has sent data
-
-    // Step 1. Master must signal it is ready to start the sensor(s)
-    // Step 1.1. (Start the sensors)
-
-    // Step 2. Master must request that compass calibration begins
-    // Step 2.2 (Begin calibration)
+    // Master has sent data. This should set the current state (e.g. to INIT the controller).
     state = Wire.read();
 }
 
 void onRequest() {
-    Wire.write(state);
     // Master has requested data
 
-    // Step 1. Send signal that setup has begun.
-    // Step 1.1 Send signal that setup has complete.
+    // First byte is controller state
+    Wire.write(state);
 
-    // Step 2. Signal that compass calibration has begun.
-    // Step 2.2. Signal that compass calibration has complete.
+    if (state == STATE_UPDATING && orientationSensor.hasData) {
+        // If we are getting position updates, send them after the state byte
+        for (int i = 0; i < 8; i++) {
+            Wire.write(yawBuffer[i]);
+        }
+
+        for (int i = 0; i < 8; i++) {
+            Wire.write(pitchBuffer[i]);
+        }
+
+        for (int i = 0; i < 8; i++) {
+            Wire.write(rollBuffer[i]);
+        }
+    }
 }
-
-
 
 void loop() {
     switch (state) {
         case STATE_INIT:
-            Serial.println('INIT');
             orientationSensor.init();
-            state = STATE_WAITING;
-            return;
-        case STATE_CALIBRATING_COMPASS:
-            Serial.println('CAL COMPASS');
-            calibrateCompass();
-            state = STATE_WAITING;
-            return;
-        case STATE_ORIENTATION_UPDATE:
-            Serial.println('UPDATE ORIENATION');
+            // Immediately move to the mag calibration state
+            state = STATE_MAG_CALIBRATING;
+            break;
+        case STATE_MAG_CALIBRATING:
+            orientationSensor.calibrateMag();
+            // Move to updating state now that calibration is complete
+            delay(2000);
+            state = STATE_UPDATING;
+            break;
+        case STATE_UPDATING:
             orientationSensor.update();
-            state = STATE_WAITING;
-            return;
-        default:
-            state = STATE_WAITING;
-            //Serial.println('no update...');
+
+            // Move updated values into the buffers for sending over I2C
+            dtostrf(orientationSensor.sensor.yaw, 7, 2, yawBuffer);
+            dtostrf(orientationSensor.sensor.pitch, 7, 2, pitchBuffer);
+            dtostrf(orientationSensor.sensor.roll, 7, 2, rollBuffer);
+            break;
+        case STATE_WAITING:
             delay(100);
+            break;
     }
-}
-
-
-void initSensors() {
-
-}
-
-void calibrateCompass() {
-    Serial.println("xxxCalibrating!");
-    orientationSensor.calibrateMag();
-    Serial.println("xxxCalibration Done!");
 }

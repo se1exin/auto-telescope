@@ -11,17 +11,7 @@ OrientationSensor::OrientationSensor() {
     sensor = MPU9250(MPU9250_ADDRESS, I2Cport, I2Cclock);
     serialDebug = false;
     online = false;
-    declination = 0.0;
-    isMagCalibrating = false;
-}
-
-
-void OrientationSensor::setSerialDebug(bool serialDebug) {
-    OrientationSensor::serialDebug = serialDebug;
-}
-
-void OrientationSensor::setDeclination(float declination) {
-    OrientationSensor::declination = declination;
+    hasData = false;
 }
 
 void OrientationSensor::init() {
@@ -30,15 +20,18 @@ void OrientationSensor::init() {
     // Read the WHO_AM_I register, this is a good test of communication
     byte sensorAddress = sensor.readByte(MPU9250_ADDRESS, WHO_AM_I_MPU9250);
 
+    /* NOTE: serialDebug blocks max out Arduino memory
     if (serialDebug) {
         Serial.print("MPU9250 I AM 0x");
         Serial.print(sensorAddress, HEX);
         Serial.print(" I should be 0x");
         Serial.println(0x71, HEX);
     }
+     */
 
     // WHO_AM_I should always be 0x71
     if (sensorAddress != 0x71) {
+        /* NOTE: serialDebug blocks max out Arduino memory
         if (serialDebug) {
             Serial.print("Could not connect to MPU9250: 0x");
             Serial.println(sensorAddress, HEX);
@@ -47,6 +40,7 @@ void OrientationSensor::init() {
             Serial.println(F("Communication failed, abort!"));
             Serial.flush();
         }
+         */
 
         return;
     }
@@ -84,9 +78,11 @@ void OrientationSensor::init() {
 
     // Initialize device for active mode read of acclerometer, gyroscope, and
     sensor.initMPU9250();
+    /* NOTE: serialDebug blocks max out Arduino memory
     if (serialDebug) {
         Serial.println("MPU9250 initialized for active data mode....");
     }
+     */
 
     // Read the WHO_AM_I register of the magnetometer, this is a good test of communication
     byte compassAddress = sensor.readByte(AK8963_ADDRESS, WHO_AM_I_AK8963);
@@ -102,10 +98,12 @@ void OrientationSensor::init() {
 
     if (compassAddress != 0x48) {
         // Communication failed, stop here
+        /* NOTE: serialDebug blocks max out Arduino memory
         if (serialDebug) {
             Serial.println(F("Communication failed, abort!"));
             Serial.flush();
         }
+         */
         return;
     }
 
@@ -152,17 +150,16 @@ void OrientationSensor::init() {
 }
 
 void OrientationSensor::calibrateMag() {
-    isMagCalibrating = true;
     sensor.magCalMPU9250(sensor.magBias, sensor.magScale);
-
-    isMagCalibrating = false;
 }
 
 void OrientationSensor::update() {
     if (!online) {
+        /* NOTE: serialDebug blocks max out Arduino memory
         if (serialDebug) {
             Serial.println("Sensor not online. Cannot run update()");
         }
+         */
         return;
     }
 
@@ -281,9 +278,10 @@ void OrientationSensor::update() {
                             *(getQ() + 3) * *(getQ() + 3));
         sensor.pitch *= RAD_TO_DEG;
         sensor.yaw *= RAD_TO_DEG;
-        sensor.yaw -= OrientationSensor::declination;
+        // sensor.yaw -= OrientationSensor::declination; // Not doing this in this controller
         sensor.roll *= RAD_TO_DEG;
 
+        /* NOTE: serialDebug blocks max out Arduino memory
         if (serialDebug) {
             Serial.print("Yaw, Pitch, Roll: ");
             Serial.print(sensor.yaw, 2);
@@ -293,24 +291,15 @@ void OrientationSensor::update() {
             Serial.println(sensor.roll, 2);
 
             Serial.print("rate = ");
-            Serial.print((float) sensor.sumCount / sensor.sum, 2);
+            Serial.print((float) sensor.sumCount / sensor.sum, 10);
             Serial.println(" Hz");
         }
+         */
 
         sensor.count = millis();
         sensor.sumCount = 0;
         sensor.sum = 0;
+
+        hasData = true;
     } // if (sensor.delt_t > 500)
-}
-
-float OrientationSensor::getYaw() {
-    return sensor.yaw;
-}
-
-float OrientationSensor::getPitch() {
-    return sensor.pitch;
-}
-
-float OrientationSensor::getRoll() {
-    return sensor.roll;
 }

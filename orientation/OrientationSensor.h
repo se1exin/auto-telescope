@@ -6,8 +6,8 @@
 // Might be abstracted so that different sensors can be swapped out.
 // Requires the Sparkfun MPU9250 Library: https://github.com/sparkfun/SparkFun_MPU-9250_Breakout_Arduino_Library/
 
-#ifndef STEPPER_CONTROL2_ORIENTATIONSENSOR_H
-#define STEPPER_CONTROL2_ORIENTATIONSENSOR_H
+#ifndef AUTO_TELESCOPE_ORIENTATIONSENSOR_H
+#define AUTO_TELESCOPE_ORIENTATIONSENSOR_H
 
 // #include "Arduino.h"
 #include "MPU9250.h"
@@ -19,33 +19,25 @@
 
 
 class OrientationSensor {
-private:
-    MPU9250 sensor;
-    bool serialDebug;
-    bool online;
-    float declination;
-
 public:
     OrientationSensor();
 
-    bool isMagCalibrating;
+    MPU9250 sensor;
 
-    void setSerialDebug(bool serialDebug);
+    // Public setters to save memory space
+    bool serialDebug;
 
-    void setDeclination(float declination);
+    // Public getter
+    bool online;
+
+    bool hasData;
 
     void init();
 
     void calibrateMag();
 
     void update();
-
-    float getYaw();
-
-    float getPitch();
-
-    float getRoll();
 };
 
 
-#endif //STEPPER_CONTROL2_ORIENTATIONSENSOR_H
+#endif //AUTO_TELESCOPE_ORIENTATIONSENSOR_H

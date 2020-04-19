@@ -83,9 +83,9 @@ void EasyDriver::setMode(int mode) {
 
 void EasyDriver::step() {
     digitalWrite(PIN_STEP, HIGH);
-    delay(15); // @TODO: Make speed customizable
+    delay(1); // @TODO: Make speed customizable
     digitalWrite(PIN_STEP, LOW);
-    delay(15);
+    delay(1);
 }
 
 void EasyDriver::stepForward() {

@@ -1,3 +1,6 @@
 .idea
 venv
 cmake-build-debug
+__pycache__
+.pyc
+

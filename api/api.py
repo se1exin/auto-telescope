@@ -1,4 +1,5 @@
-import serial
+import threading
+import time
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -6,26 +7,65 @@ from skyfield.api import load
 from skyfield.toposlib import Topos
 from skyfield.trigonometry import position_angle_of
 
-serial_port = serial.Serial(
-	port='/dev/ttyACM0',
-	baudrate=9600
-)
+from stepper.stepper import Stepper
+from imu.imu import IMU
+
 
 app = Flask(__name__)
 CORS(app)
 
+stepper = Stepper()
+imu = IMU()
+imu.configure()
 
-def send_position(pos_x, pos_y):
-	serial_command = str.encode(
-		"x{};y{};".format(pos_x, pos_y)
-	)
-	serial_port.write(serial_command)
 
+@app.route("/calibrate", methods=["POST"])
+def calibrate():
+	# To calibrate the mag we need to move the sensor around.
+	# The best we can do is just spin the motor as fast as we can during calibration
+	stepper.enable()
+	stepper.set_mode_full_step()
+
+	# Start calibration in another thread so we can rotate the motor in this thread.
+	x = threading.Thread(target=imu.calibrate_mag)
+	x.start()
+
+	while imu.is_calibrating_mag:
+		# stepper.step_forward()
+		pass
+
+	# Mag calibration complete
+	stepper.disable()
+
+	# The rest of the sensors (accel, gyro) must be calibrated while not moving
+	time.sleep(1)
+	imu.calibrate_mpu()
+
+	# Calibration function resets the sensors, so we need to reconfigure them
+	imu.configure()
+	return jsonify({'success': True})
+
+
+@app.route("/position")
+def get_position():
+	return jsonify(imu.get_position())
 
 @app.route("/position", methods=["POST"])
-def update_servo_positions():
+def update_position():
 	content = request.get_json()
-	send_position(content["x"], content["y"])
+	pos_x = content["x"]
+
+	stepper.enable()
+	stepper.set_mode_half_step()
+
+	mag_pos = imu.get_mag()
+	while mag_pos['x'] != pos_x:
+		print(mag_pos)
+		stepper.step_forward()
+		mag_pos = imu.get_mag()
+
+	stepper.disable()
+
 	return jsonify({'success': True})
 
 
@@ -55,7 +95,7 @@ def move_to_planet():
 		pos_x = pos_x - 180
 		pos_y = pos_y - 90
 
-	send_position(pos_x, pos_y)
+	# send_position(pos_x, pos_y)
 
 	return jsonify({
 		'x': pos_x,

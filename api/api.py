@@ -16,7 +16,7 @@ CORS(app)
 
 stepper = Stepper()
 imu = IMU()
-imu.configure()
+imu.init()
 
 
 @app.route("/calibrate", methods=["POST"])
@@ -31,7 +31,7 @@ def calibrate():
 	x.start()
 
 	while imu.is_calibrating_mag:
-		# stepper.step_forward()
+		stepper.step_forward()
 		pass
 
 	# Mag calibration complete
@@ -42,9 +42,17 @@ def calibrate():
 	imu.calibrate_mpu()
 
 	# Calibration function resets the sensors, so we need to reconfigure them
-	imu.configure()
 	return jsonify({'success': True})
 
+
+@app.route("/imu/start", methods=["POST"])
+def start_imu():
+	if imu.updating:
+		return jsonify({'success': False})
+
+	x = threading.Thread(target=imu.update, daemon=True)
+	x.start()
+	return jsonify({'success': True})
 
 @app.route("/position")
 def get_position():
@@ -58,11 +66,11 @@ def update_position():
 	stepper.enable()
 	stepper.set_mode_half_step()
 
-	mag_pos = imu.get_mag()
-	while mag_pos['x'] != pos_x:
+	mag_pos = imu.yaw
+	while mag_pos != pos_x:
 		print(mag_pos)
 		stepper.step_forward()
-		mag_pos = imu.get_mag()
+		mag_pos = imu.yaw
 
 	stepper.disable()
 

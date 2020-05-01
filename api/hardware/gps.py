@@ -1,6 +1,7 @@
 import threading
 
 import serial
+
 import pynmea2
 
 
@@ -11,13 +12,14 @@ class GPS(object):
         self.longitude = 0
         self.has_position = False
         self.updating = False
+        self.declination = 0.0  # @TODO: Implement (using pyIGRF library)
 
     def stop_updating(self):
         self.updating = False
 
     def start_updating(self):
         if self.updating:
-            return
+            return False
 
         self.updating = True
         x = threading.Thread(target=self._update_loop, daemon=True)
@@ -27,10 +29,14 @@ class GPS(object):
     def _update_loop(self):
         serial_port = serial.Serial(self.serial_address, 9600, timeout=0.5)
         while self.updating:
-            result = str(serial_port.readline(), 'utf-8')
-            if result.find('GGA') > 0:
-                msg = pynmea2.parse(result)
-                self.latitude = msg.latitude
-                self.longitude = msg.longitude
-                self.has_position = True
+            try:
+                result = str(serial_port.readline(), "utf-8")
+                if result.find("GGA") > 0:
+                    msg = pynmea2.parse(result)
+                    self.latitude = msg.latitude
+                    self.longitude = msg.longitude
+                    self.has_position = True
+            except Exception as ex:
+                print(ex)
+
         serial_port.close()

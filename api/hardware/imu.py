@@ -1,14 +1,12 @@
-import sys
+import threading
+import time
+from collections import deque
 
 from ahrs.common import DEG2RAD, RAD2DEG
 from ahrs.common.orientation import q2euler
-
-sys.path.append("")
-
-import time
 from ahrs.filters import Madgwick
-from mpu9250_jmdev.registers import *
 from mpu9250_jmdev.mpu_9250 import MPU9250
+from mpu9250_jmdev.registers import *
 
 
 class IMU(object):
@@ -23,18 +21,27 @@ class IMU(object):
             gfs=GFS_1000,
             afs=AFS_8G,
             mfs=AK8963_BIT_16,
-            mode=AK8963_MODE_C100HZ)
+            mode=AK8963_MODE_C100HZ,
+        )
 
         self.is_calibrating_mag = False
+        self.mag_calibrated = False
+        self.mpu_calibrated = False
         self.updating = False
 
-        self.mpu9250.magBias = [20.7454594017094,
-                                10.134935897435899,
-                                -11.132967032967032]
-        self.mpu9250.magScale = [1.0092850510677809,
-                                1.0352380952380953,
-                                0.9585537918871252]
+        self.mpu9250.magBias = [
+            20.7454594017094,
+            10.134935897435899,
+            -11.132967032967032,
+        ]
+        self.mpu9250.magScale = [
+            1.0092850510677809,
+            1.0352380952380953,
+            0.9585537918871252,
+        ]
 
+        self.has_position = False
+        self.position_stable = False  # @TODO: Implement stability detection
         self.roll = 0.0
         self.pitch = 0.0
         self.yaw = 0.0
@@ -46,9 +53,11 @@ class IMU(object):
         self.is_calibrating_mag = True
         self.mpu9250.calibrateAK8963()
         self.is_calibrating_mag = False
+        self.mag_calibrated = True
 
     def calibrate_mpu(self):
         self.mpu9250.calibrateMPU6500()
+        self.mpu_calibrated = True
 
     def stop_updating(self):
         self.updating = False
@@ -56,11 +65,20 @@ class IMU(object):
     def start_updating(self):
         # Calculate AHRS
         if self.updating:
-            return
+            return False
 
         self.updating = True
+        x = threading.Thread(target=self._update_loop, daemon=True)
+        x.start()
+        return True
+
+    def _update_loop(self):
         madgwick = Madgwick(frequency=50, beta=1)
         q = [1, 0, 0, 0]
+
+        yaw_readings = deque([])
+        yaw_buffer_size = 500
+
         while self.updating:
             accel = self.mpu9250.readAccelerometerMaster()
             gyro = list(map(lambda x: x * DEG2RAD, self.mpu9250.readGyroscopeMaster()))
@@ -74,40 +92,30 @@ class IMU(object):
             # Strangely the sensor yaw is negative to the right. Let's invert that
             self.yaw = -(attitude[2] * RAD2DEG)
 
-            # print(self.yaw)
+            self.has_position = True
+            # @TODO: Stability detection
 
-            # print("roll %f, pitch %f, yaw %f" % (self.roll, self.pitch, self.yaw))
-            time.sleep(0.02)
+            # Low pass filter for yaw readings
+            # Also used to determine if the current yaw reading is 'stable' or not
+            yaw_readings.append(self.yaw)
+            if len(yaw_readings) >= yaw_buffer_size:
+                yaw_readings.popleft()
+                yaw_sum = 0
+                for reading in yaw_readings:
+                    yaw_sum += reading
 
-    def get_accel(self):
-        data = self.mpu9250.readAccelerometerMaster()
-        return {
-            'x': data[0],
-            'y': data[1],
-            'z': data[2],
-        }
+                average = yaw_sum / yaw_buffer_size
+                diff = self.yaw - average
+                self.position_stable = True if (diff < 1) else False
+                # print(diff, self.yaw, average)
+            else:
+                self.position_stable = False
 
-    def get_gyro(self):
-        data = self.mpu9250.readGyroscopeMaster()
-        return {
-            'x': data[0],
-            'y': data[1],
-            'z': data[2],
-        }
+            time.sleep(0.01)
 
-    def get_mag(self):
-        data = self.mpu9250.readMagnetometerMaster()
-        return {
-            'x': data[0],
-            'y': data[1],
-            'z': data[2],
-        }
-
-    def get_position(self):
-        return {
-            'mag': self.get_mag(),
-            'gyro': self.get_gyro(),
-            'accel': self.get_accel()
-        }
-
-
+        # We have stopped updating, reset everything back to zero/off
+        self.has_position = False
+        self.position_stable = False
+        self.roll = 0.0
+        self.pitch = 0.0
+        self.yaw = 0.0

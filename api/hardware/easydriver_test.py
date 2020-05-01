@@ -6,7 +6,6 @@
 
 from easydriver import EasyDriver
 
-
 # Direction of rotation is dependent on how the motor is connected.
 # If the motor runs the wrong way swap the values of cw and ccw.
 cw = True
@@ -28,10 +27,16 @@ Name as a string.
 
 # Create an instance of the easydriver class.
 # Not using sleep, enable or reset in this example.
-stepper = EasyDriver(pin_step=4, pin_direction=17,
-                     pin_ms1=27, pin_ms2=22,
-                     pin_sleep=10, pin_enable=9,
-                     pin_reset=11, delay=0.004)
+stepper = EasyDriver(
+    pin_step=4,
+    pin_direction=17,
+    pin_ms1=27,
+    pin_ms2=22,
+    pin_sleep=10,
+    pin_enable=9,
+    pin_reset=11,
+    delay=0.004,
+)
 
 stepper.enable()
 stepper.wake()

@@ -70,9 +70,11 @@ class IMU(object):
             attitude = q2euler(q)
             self.roll = attitude[0] * RAD2DEG
             self.pitch = attitude[1] * RAD2DEG
-            self.yaw = attitude[2] * RAD2DEG
 
-            print(self.yaw)
+            # Strangely the sensor yaw is negative to the right. Let's invert that
+            self.yaw = -(attitude[2] * RAD2DEG)
+
+            # print(self.yaw)
 
             # print("roll %f, pitch %f, yaw %f" % (self.roll, self.pitch, self.yaw))
             time.sleep(0.02)

@@ -107,7 +107,9 @@ class Telescope(object):
         self.target_position_y = position_y
         self.moving_to_position = True
 
-        x = threading.Thread(target=self._move_to_position, daemon=True, args=(position_x, position_y,))
+        x = threading.Thread(
+            target=self._move_to_position, daemon=True, args=(position_x, position_y,)
+        )
         x.start()
         return True
 
@@ -183,6 +185,7 @@ class Telescope(object):
     def _normalise_yaw(self, yaw):
         # Yaw is from -180 to +180. 0 == North.
         # Convert to 0 -> 360 degrees
+        yaw += self.gps.declination
         if yaw < 0:
             return 360 - abs(yaw)
         return yaw

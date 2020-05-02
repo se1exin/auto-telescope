@@ -1,8 +1,12 @@
+import datetime
 import threading
 
 import serial
 
+import pyIGRF
 import pynmea2
+
+now = datetime.datetime.now()
 
 
 class GPS(object):
@@ -35,8 +39,16 @@ class GPS(object):
                     msg = pynmea2.parse(result)
                     self.latitude = msg.latitude
                     self.longitude = msg.longitude
+
+                    igrf = pyIGRF.igrf_value(
+                        self.latitude, self.longitude, msg.altitude, now.year
+                    )
+                    self.declination = igrf[0]
+
                     self.has_position = True
+
             except Exception as ex:
-                print(ex)
+                pass
+                # print(ex)
 
         serial_port.close()

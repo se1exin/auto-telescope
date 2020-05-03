@@ -1,0 +1,22 @@
+.status-indicator {
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  display: inline-block;
+  transition: background-color 0.3s;
+  vertical-align: middle;
+  margin: 0 5px;
+  border: 1px solid transparent;
+  &.success {
+    background-color: green;
+  }
+  &.error {
+    background-color: red;
+  }
+  &.warning {
+    background-color: orange;
+  }
+  &.info {
+    border: 1px solid blue;
+  }
+}

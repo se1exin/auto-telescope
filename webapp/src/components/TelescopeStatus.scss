@@ -1,0 +1,33 @@
+.telescope-status {
+  background: rgba(0, 0, 0, 0.5);
+  text-transform: uppercase;
+  font-size: 0.9rem;
+  padding: 15px;
+
+  .row {
+    margin: 5px 0;
+  }
+
+  .circle {
+    width: 100px;
+    height: 100px;
+    position: relative;
+    border: 1px solid blue;
+    border-radius: 50px;
+    .pointer {
+      width: 2px;
+      height: 50px;
+      position: absolute;
+      left: 50%;
+      transform-origin: bottom;
+
+      &.current-position {
+        background-color: green;
+      }
+
+      &.target-position {
+        background-color: orange;
+      }
+    }
+  }
+}

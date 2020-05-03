@@ -1,27 +1,41 @@
+import threading
 import time
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from flask_socketio import SocketIO
 from skyfield.api import load
 from skyfield.toposlib import Topos
 from telescope.telescope import Telescope
 
 app = Flask(__name__)
 CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 telescope = Telescope()
 
 
 @app.route("/start", methods=["POST"])
 def start():
-    telescope.imu_calibrate()
-    telescope.imu_start()
-    telescope.gps_start()
+    if not telescope.started:
+        telescope.start()
+        x = threading.Thread(target=status_emitter, daemon=True)
+        x.start()
+
     status = telescope.status()
-    return jsonify({
-        "success": True,
-        **status,
-    })
+    return jsonify({"success": True, **status,})
+
+
+def status_emitter():
+    with app.test_request_context():
+        while True:
+            try:
+                status = telescope.status()
+                socketio.emit("status", status)
+            except Exception as ex:
+                print(ex)
+                pass
+            time.sleep(0.3)
 
 
 @app.route("/status")
@@ -139,4 +153,4 @@ def move_to_planet():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    socketio.run(app, host="0.0.0.0", port=8080)

@@ -45,6 +45,7 @@ class IMU(object):
         self.roll = 0.0
         self.pitch = 0.0
         self.yaw = 0.0
+        self.yaw_smoothed = 0.0
 
     def configure(self):
         self.mpu9250.configure()
@@ -101,17 +102,20 @@ class IMU(object):
             if len(yaw_readings) >= yaw_buffer_size:
                 yaw_readings.popleft()
                 yaw_sum = 0
+                yaw_diff = self.yaw
                 for reading in yaw_readings:
                     yaw_sum += reading
+                    yaw_diff -= reading
 
                 average = yaw_sum / yaw_buffer_size
+                self.yaw_smoothed = average
                 diff = self.yaw - average
-                self.position_stable = True if (diff < 1) else False
+                self.position_stable = True if (diff < 0.5) else False
                 # print(diff, self.yaw, average)
             else:
                 self.position_stable = False
 
-            time.sleep(0.01)
+            time.sleep(0.001)
 
         # We have stopped updating, reset everything back to zero/off
         self.has_position = False

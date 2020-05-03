@@ -29,6 +29,16 @@ class Telescope(object):
         self.target_position_x = 0.0
         self.target_position_y = 0.0
 
+        self.started = False
+
+    def start(self):
+        if not self.started:
+            self.imu_calibrate()
+            self.imu_start()
+            self.gps_start()
+            self.started = True
+        return self.status()
+
     def status(self):
         # Overall status of all sensors and positions
         return {
@@ -39,6 +49,7 @@ class Telescope(object):
             "mpu_calibrated": self.imu.mpu_calibrated,
             "imu_calibrated": self.imu.mag_calibrated and self.imu.mpu_calibrated,
             "yaw": self.imu.yaw,
+            "yaw_smoothed": self._normalise_yaw(self.imu.yaw_smoothed),
             "yaw_normalised": self._normalise_yaw(self.imu.yaw),
             "roll": self.imu.roll,
             "pitch": self.imu.pitch,
@@ -120,7 +131,7 @@ class Telescope(object):
         # We keep doing this until we hit the target
 
         while self.moving_to_position:
-            mag_pos = self._normalise_yaw(self.imu.yaw)
+            mag_pos = self._normalise_yaw(self.imu.yaw_smoothed)
 
             print("Are we there yet?", int(mag_pos), position_x)
 
@@ -134,7 +145,6 @@ class Telescope(object):
             self.stepper.enable()
             self.stepper.set_eighth_step()
             steps_per_rev = 1600
-            stabilisation_delay = 4
 
             # As the distance gets smaller, slow down the motor speed and time between rotation/stabilisation attempts
             # if abs(distance) > 120:

@@ -17,14 +17,15 @@ class Telescope(object):
             pin_sleep=10,
             pin_enable=9,
             pin_reset=11,
-            delay=0.004,
+            delay=0.005,
+            gear_ratio=18,
         )
         self.gps = GPS()
         self.imu = IMU()
         self.imu.configure()
 
         # Gear ratio of X axis gear system
-        self.gear_ratio_x = 20.142857143  # to 1
+        self.gear_ratio_x = 18  # to 18:1
         self.moving_to_position = False
         self.target_position_x = 0.0
         self.target_position_y = 0.0
@@ -61,6 +62,7 @@ class Telescope(object):
             "moving_to_position": self.moving_to_position,
             "target_position_x": self.target_position_x,
             "target_position_y": self.target_position_y,
+            "stepper_position": self.stepper.current_position,
         }
 
     # IMU functions
@@ -129,68 +131,54 @@ class Telescope(object):
         # To move to the target position, we first move to an estimated position,
         # then wait for stabilisation and see how far off we are.
         # We keep doing this until we hit the target
+        allowed_error_margin = 0.5  # Allowed error in degrees
+
+        while not self.imu.position_stable:
+            time.sleep(1)
 
         while self.moving_to_position:
             mag_pos = self._normalise_yaw(self.imu.yaw_smoothed)
+            degrees = self._degrees_between_points(mag_pos, position_x)
 
-            print("Are we there yet?", int(mag_pos), position_x)
+            self.stepper.current_position = mag_pos
 
-            if int(mag_pos) == position_x:
+            print("Are we there yet?", mag_pos, position_x, degrees, abs(degrees))
+            if abs(degrees) <= allowed_error_margin:
                 self.moving_to_position = False
-                break
+                return
 
-            distance = self._distance_between_points(mag_pos, position_x)
-            distance_perc = abs(distance) / 360
+            self._rotate_stepper_by_degrees(degrees)
 
-            self.stepper.enable()
-            self.stepper.set_eighth_step()
-            steps_per_rev = 1600
-
-            # As the distance gets smaller, slow down the motor speed and time between rotation/stabilisation attempts
-            # if abs(distance) > 120:
-            # 	stepper.set_full_step()
-            # 	steps_per_rev = 200
-            # 	stabilisation_delay = 5
-            # 	print("Full step")
-            # elif abs(distance) > 60:
-            # 	stepper.set_half_step()
-            # 	steps_per_rev = 400
-            # 	stabilisation_delay = 4
-            # 	print("Half step")
-            # elif abs(distance) > 30:
-            # 	stepper.set_quarter_step()
-            # 	steps_per_rev = 800
-            # 	stabilisation_delay = 3
-            # 	print("Quarter step")
-            # else:
-            # 	stepper.set_eighth_step()
-            # 	steps_per_rev = 1600
-            # 	stabilisation_delay = 2
-            # 	print("Eighth step")
-
-            steps_required = steps_per_rev * self.gear_ratio_x * distance_perc
-
-            print(
-                mag_pos,
-                position_x,
-                distance,
-                distance_perc,
-                steps_per_rev,
-                steps_required,
-            )
-
-            for i in range(1, int(steps_required)):
-                # print(self.imu.yaw)
-                if distance < 0:
-                    self.stepper.step_reverse()
-                else:
-                    self.stepper.step_forward()
-
-            self.stepper.disable()
+            time.sleep(1)  # Wait for mag stabilisation
             while not self.imu.position_stable:
-                time.sleep(0.01)  # Wait for mag stabilisation
+                time.sleep(3)
 
         self.moving_to_position = False
+
+    def _rotate_stepper_by_degrees(self, degrees):
+        self.stepper.enable()
+        degrees_abs = abs(degrees)
+
+        # As the distance gets smaller, slow down the motor speed and time between rotation/stabilisation attempts
+        if degrees_abs < 15:
+            self.stepper.set_eighth_step()
+        elif degrees_abs < 60:
+            self.stepper.set_quarter_step()
+        elif degrees_abs < 90:
+            self.stepper.set_half_step()
+        else:
+            self.stepper.set_full_step()
+
+        num_steps_required = degrees_abs / self.stepper.degrees_per_step()
+        print("STEPS REQUIRED", num_steps_required)
+
+        for i in range(0, int(num_steps_required)):
+            if degrees < 0:
+                self.stepper.step_reverse()
+            else:
+                self.stepper.step_forward()
+
+        self.stepper.disable()
 
     def _normalise_yaw(self, yaw):
         # Yaw is from -180 to +180. 0 == North.
@@ -200,7 +188,7 @@ class Telescope(object):
             return 360 - abs(yaw)
         return yaw
 
-    def _distance_between_points(self, current_pos, target_pos):
+    def _degrees_between_points(self, current_pos, target_pos):
         """
         Calculate the shortest distance between two points on a circle
         """

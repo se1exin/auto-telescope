@@ -2,6 +2,8 @@ import threading
 import time
 from collections import deque
 
+import numpy
+
 from ahrs.common import DEG2RAD, RAD2DEG
 from ahrs.common.orientation import q2euler
 from ahrs.filters import Madgwick
@@ -74,7 +76,7 @@ class IMU(object):
         return True
 
     def _update_loop(self):
-        madgwick = Madgwick(frequency=50, beta=1)
+        madgwick = Madgwick(frequency=50, beta=0.1)
         q = [1, 0, 0, 0]
 
         yaw_readings = deque([])
@@ -101,21 +103,14 @@ class IMU(object):
             yaw_readings.append(self.yaw)
             if len(yaw_readings) >= yaw_buffer_size:
                 yaw_readings.popleft()
-                yaw_sum = 0
-                yaw_diff = self.yaw
-                for reading in yaw_readings:
-                    yaw_sum += reading
-                    yaw_diff -= reading
 
-                average = yaw_sum / yaw_buffer_size
-                self.yaw_smoothed = average
-                diff = self.yaw - average
-                self.position_stable = True if (diff < 0.5) else False
-                # print(diff, self.yaw, average)
+                yaw_numpy = numpy.array(yaw_readings)
+                self.yaw_smoothed = yaw_numpy.mean()
+                self.position_stable = True if (yaw_numpy.std() < 0.5) else False
             else:
                 self.position_stable = False
 
-            time.sleep(0.001)
+            time.sleep(0.0005)
 
         # We have stopped updating, reset everything back to zero/off
         self.has_position = False

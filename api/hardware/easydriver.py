@@ -17,6 +17,7 @@ class EasyDriver(object):
         pin_sleep=0,
         pin_enable=0,
         pin_reset=0,
+        gear_ratio=1,
         name="Stepper",
     ):
         self.pin_step = pin_step
@@ -28,6 +29,9 @@ class EasyDriver(object):
         self.pin_enable = pin_enable
         self.pin_reset = pin_reset
         self.name = name
+        self.steps_per_rev = 200
+        self.gear_ratio = gear_ratio
+        self.current_position = 0
 
         gpio.setmode(gpio.BCM)
         gpio.setwarnings(False)
@@ -53,13 +57,18 @@ class EasyDriver(object):
             gpio.setup(self.pin_reset, gpio.OUT)
             gpio.output(self.pin_reset, True)
 
+    def degrees_per_step(self):
+        return 360 / (self.steps_per_rev * self.gear_ratio)
+
     def step_forward(self):
         self.set_direction(True)
         self.step()
+        self.current_position += self.degrees_per_step()
 
     def step_reverse(self):
         self.set_direction(False)
         self.step()
+        self.current_position -= self.degrees_per_step()
 
     def step(self):
         gpio.output(self.pin_step, True)
@@ -73,18 +82,22 @@ class EasyDriver(object):
     def set_full_step(self):
         gpio.output(self.pin_microstep_1, False)
         gpio.output(self.pin_microstep_2, False)
+        self.steps_per_rev = 200
 
     def set_half_step(self):
         gpio.output(self.pin_microstep_1, True)
         gpio.output(self.pin_microstep_2, False)
+        self.steps_per_rev = 400
 
     def set_quarter_step(self):
         gpio.output(self.pin_microstep_1, False)
         gpio.output(self.pin_microstep_2, True)
+        self.steps_per_rev = 800
 
     def set_eighth_step(self):
         gpio.output(self.pin_microstep_1, True)
         gpio.output(self.pin_microstep_2, True)
+        self.steps_per_rev = 1600
 
     def sleep(self):
         gpio.output(self.pin_sleep, False)

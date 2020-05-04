@@ -121,6 +121,24 @@ def update_position():
     return jsonify({"success": result})
 
 
+@app.route("/position/cancel", methods=["POST"])
+def cancel_position_update():
+    # Flag that movement should stop. It will take a few seconds to stop.
+    telescope.moving_to_position = False
+
+    return jsonify({"success": True})
+
+
+@app.route("/rotate", methods=["POST"])
+def update_rotate():
+    content = request.get_json()
+    pos_x = content["x"]
+
+    result = telescope._rotate_degrees(pos_x)
+
+    return jsonify({"success": result})
+
+
 @app.route("/planet")
 def move_to_planet():
     planet_name = request.args.get("name")

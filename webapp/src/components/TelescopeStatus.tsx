@@ -20,6 +20,7 @@ export interface ITelescopeStatus {
     pitch: number
     roll: number
     success: boolean
+    stepper_position: number
     target_position_x: number
     target_position_y: number
     yaw: number
@@ -46,6 +47,7 @@ const initialStatus: ITelescopeStatus = {
     pitch: 0,
     roll: 0,
     success: false,
+    stepper_position: 0,
     target_position_x: 0,
     target_position_y: 0,
     yaw: 0,
@@ -118,19 +120,27 @@ export function TelescopeStatus() {
                 {status.moving_to_position ? 'Moving' : 'Not Moving' }
             </div>
 
-            <div>Yaw Position: { status.yaw_smoothed.toFixed(2) } / { status.target_position_x }</div>
-
             <div>
                 Lat: { status.latitude }
+            </div>
+            <div>
                 Lng: { status.longitude }
             </div>
 
             <div className={'circle'}>
                 <div className={'pointer target-position'}
                      style={{'transform': `rotate(${status.target_position_x}deg` }}/>
-                <div className={'pointer current-position'}
+                <div className={'pointer current-position-smoothed'}
                      style={{'transform': `rotate(${status.yaw_smoothed}deg` }}/>
+                <div className={'pointer current-position'}
+                     style={{'transform': `rotate(${status.yaw_normalised}deg` }}/>
+                <div className={'pointer stepper-position'}
+                     style={{'transform': `rotate(${status.stepper_position}deg` }}/>
             </div>
+            <div>Yaw Target { status.target_position_x.toFixed(2) }</div>
+            <div>Yaw Smoothed: { status.yaw_smoothed.toFixed(2) }</div>
+            <div>Yaw Raw: { status.yaw_normalised.toFixed(2) }</div>
+            <div>Stepper Pos: { status.stepper_position.toFixed(2) }</div>
         </div>
     )
 }

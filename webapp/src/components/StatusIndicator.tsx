@@ -1,5 +1,4 @@
 import React, {useEffect, useState} from 'react';
-import './StatusIndicator.scss';
 
 export enum Status {
     Success = 'success',
@@ -9,19 +8,15 @@ export enum Status {
 }
 
 interface IStatusIndicator {
-    status: Status
+    status: Status,
+    title?: string
 }
 
-const BASE_CLASS = 'status-indicator';
-
 export function StatusIndicator(props: IStatusIndicator) {
-    let [className, setClassName] = useState(BASE_CLASS);
-
-    useEffect(() => {
-        setClassName(`${BASE_CLASS} ${props.status}`);
-    }, [props.status]);
-
     return (
-        <span className={className} />
+        <div className={'status-indicator'}>
+            <span className={`indicator ${props.status}`} />
+            <span className={'title'}>{props.title}</span>
+        </div>
     )
 }

@@ -1,5 +1,4 @@
 import axios from "axios";
-import {ITelescopeStatus} from "../components/TelescopeStatus";
 
 const API_ADDRESS = "http://10.1.1.19:8080";
 

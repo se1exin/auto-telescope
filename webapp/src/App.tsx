@@ -19,7 +19,7 @@ export interface ITelescopeStatus {
   longitude: number
   mag_calibrated: boolean
   mag_heading_raw: number
-  moving_to_position: boolean
+  moving_to_target: boolean
   mpu_calibrated: boolean
   pitch: number
   roll: number
@@ -48,7 +48,7 @@ const initialStatus: ITelescopeStatus = {
   longitude: 0,
   mag_calibrated: false,
   mag_heading_raw: 0,
-  moving_to_position: false,
+  moving_to_target: false,
   mpu_calibrated: false,
   pitch: 0,
   roll: 0,
@@ -114,6 +114,12 @@ function App() {
 
   const onSelectPlanet = (name: string) => {
     console.log('planet', name);
+    axios.post(`${API_ADDRESS}/planet`, {'name': name}).then(result => {
+      console.log(result);
+      setPositionDisabled(false);
+    }).catch(() => {
+      setPositionDisabled(false);
+    })
   }
 
   return (
@@ -125,7 +131,7 @@ function App() {
         imu_has_position={status.imu_has_position}
         imu_position_stable={status.imu_position_stable}
         imu_updating={status.imu_updating}
-        moving_to_position={status.moving_to_position}
+        moving_to_target={status.moving_to_target}
         started={status.started}
         target_found={status.target_found}
       />
@@ -149,7 +155,7 @@ function App() {
               disabled={startDisabled}
           >Initialise Telescope</button>
         }
-        { (status.started && !status.moving_to_position) &&
+        { (status.started && !status.moving_to_target) &&
         <>
           <button
               onClick={onPressPosition}
@@ -163,7 +169,7 @@ function App() {
           />
         </>
         }
-        {(status.started && status.moving_to_position) &&
+        {(status.started && status.moving_to_target) &&
         <button onClick={onPressCancelPosition}>Cancel Targeting</button>
         }
       </div>

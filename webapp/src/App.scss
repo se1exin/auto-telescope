@@ -1,5 +1,5 @@
-$color-danger: #484A47;
-$color-warning: #FE5E41;
+$color-danger: #FE5E41;
+$color-warning: #F6AE2D;
 $color-success: #00A878;
 
 $color-white: #EAF2E3;
@@ -89,7 +89,7 @@ button {
       border-radius: 5px;
       transform-origin: bottom;
       width: 12px;
-      transition: transform 0.3s;
+      // transition: transform 0.3s;
 
       &.target-pos {
         background-color: #1B065E;
@@ -228,7 +228,7 @@ button {
     color: $color-black;
     padding: 10px 20px;
     margin-left: 2px;
-    width: 50px;
+    width: 100px;
     text-align: center;
   }
 }

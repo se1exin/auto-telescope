@@ -8,7 +8,7 @@ export interface IStatusBarProps {
   imu_has_position: boolean
   imu_position_stable: boolean
   imu_updating: boolean
-  moving_to_position: boolean
+  moving_to_target: boolean
   target_found: boolean
   started: boolean
 }
@@ -76,8 +76,8 @@ export function StatusBar(props: IStatusBarProps) {
             :
             <>
                 <StatusIndicator
-                    status={props.moving_to_position ? Status.Warning : Status.Error}
-                    title={props.moving_to_position ? 'Targeting...' : 'No Target' }
+                    status={props.moving_to_target ? Status.Warning : Status.Error}
+                    title={props.moving_to_target ? 'Targeting' : 'No Target' }
                 />
             </>
         }

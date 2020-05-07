@@ -28,6 +28,7 @@ export interface ITelescopeStatus {
   stepper_position: number
   target_position_x: number
   target_position_y: number
+  target_found: boolean
   yaw: number
   yaw_normalised: number
   yaw_smoothed: number
@@ -56,6 +57,7 @@ const initialStatus: ITelescopeStatus = {
   stepper_position: 0,
   target_position_x: 0,
   target_position_y: 0,
+  target_found: false,
   yaw: 0,
   yaw_normalised: 0,
   yaw_smoothed: 0
@@ -110,6 +112,10 @@ function App() {
     axios.post(`${API_ADDRESS}/position/cancel`);
   }
 
+  const onSelectPlanet = (name: string) => {
+    console.log('planet', name);
+  }
+
   return (
     <div className="app">
       <StatusBar
@@ -121,36 +127,28 @@ function App() {
         imu_updating={status.imu_updating}
         moving_to_position={status.moving_to_position}
         started={status.started}
+        target_found={status.target_found}
       />
 
       <div className={'main'}>
-        <div className={'fly-wheel-container'}>
-          <div className={'fly-wheel-x'}>
-            <FlyWheel
-              current_pos={status.yaw_normalised}
-              estimated_pos={status.stepper_position}
-              raw_pos={status.mag_heading_raw}
-              smoothed_pos={status.yaw_smoothed}
-              target_pos={status.target_position_x}
-            />
-          </div>
-        </div>
-
-
-        <PlanetSelector />
+        <FlyWheel
+            current_pos={status.yaw_normalised}
+            estimated_pos={status.stepper_position}
+            raw_pos={status.mag_heading_raw}
+            smoothed_pos={status.yaw_smoothed}
+            target_pos={status.target_position_x}
+        />
+        <PlanetSelector onSelect={onSelectPlanet} />
       </div>
-
-
 
       <div className={'control-bar'}>
         { !status.started &&
-        <button
-            className={'start-button'}
-            onClick={onPressStart}
-            disabled={startDisabled}
-        >Initialise Telescope</button>
+          <button
+              className={'start-button'}
+              onClick={onPressStart}
+              disabled={startDisabled}
+          >Initialise Telescope</button>
         }
-
         { (status.started && !status.moving_to_position) &&
         <>
           <button
@@ -166,13 +164,9 @@ function App() {
         </>
         }
         {(status.started && status.moving_to_position) &&
-        <button
-            onClick={onPressCancelPosition}
-        >Cancel Targeting</button>
+        <button onClick={onPressCancelPosition}>Cancel Targeting</button>
         }
-
       </div>
-
     </div>
   );
 }

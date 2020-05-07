@@ -10,11 +10,14 @@ body {
   height: 100%;
   width: 100%;
   background-color: $color-black;
-  box-sizing: border-box;
   color: $color-white;
 }
 
-/* Button Reset */
+* {
+  box-sizing: border-box;
+}
+
+/* Basic Form Reset */
 input,
 button {
   padding: 0;
@@ -23,16 +26,20 @@ button {
   color: inherit;
   background-color: transparent;
   cursor: pointer;
-
 }
 
 .app {
   font-family: 'Source Code Pro', monospace;
   font-size: 18px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
 .main {
+  flex: 1;
   display: flex;
+  align-items: center;
   .fly-wheel-container {
     flex: 1;
   }
@@ -43,10 +50,6 @@ button {
 
 .status-bar {
   display: flex;
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
   padding: 10px;
   background-color: #333;
   color: $color-white;
@@ -55,18 +58,8 @@ button {
   .col {
     flex: 1;
     text-align: center;
-    font-size: 0.8rem;
+    font-size: 0.9rem;
   }
-}
-
-.fly-wheel-x {
-  width: 50%;
-  position: absolute;
-  margin: auto;
-  top: 50%;
-  left: 0;
-  right: 0;
-  transform: translateY(-50%);
 }
 
 /**
@@ -78,6 +71,7 @@ button {
   margin: auto;
   position: relative;
   font-size: 0.8rem;
+  padding: 30px;
   .circle {
     padding-top: 100%;
     position: relative;
@@ -91,10 +85,10 @@ button {
       position: absolute;
       top: 0;
       height: 50%;
-      left: calc(50% - 5px);
+      left: calc(50% - 6px);
       border-radius: 5px;
       transform-origin: bottom;
-      width: 10px;
+      width: 12px;
       transition: transform 0.3s;
 
       &.target-pos {
@@ -103,6 +97,8 @@ button {
       &.estimated-pos {
         height: 45%;
         top: 5%;
+        width: 10px;
+        left: calc(50% - 5px);
         background-color: #00A1E4;
       }
 
@@ -200,9 +196,6 @@ button {
 }
 
 .control-bar {
-  position: absolute;
-  bottom: 0;
-  left: 0;
   width: 100%;
   padding: 5px;
   display: flex;
@@ -243,23 +236,30 @@ button {
 .planet-selector {
   .planet {
     cursor: pointer;
-    width: 100%;
     display: flex;
     color: $color-black;
     align-items: center;
-    padding: 5px 20px 5px 10px;
+    padding: 5px 60px 5px 10px;
     background-color: $color-white;
     transition: background-color 0.3s;
+    border-bottom: 1px solid $color-black;
 
     &:hover {
-      background-color: darken($color-white, 5%);
+      background-color: lighten($color-black, 70%);
+    }
+
+    &.selected {
+      background-color: lighten($color-black, 60%);
     }
 
     .image {
       display: block;
       width: 60px;
       height: auto;
-      margin-right: 20px;
+      margin-right: 10px;
+    }
+    .details {
+      text-transform: capitalize;
     }
   }
 }

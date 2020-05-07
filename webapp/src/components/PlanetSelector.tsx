@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState} from 'react';
 import imgJupiter from "../images/jupiter-planet.png";
 import imgMars from "../images/mars-planet.png";
 import imgMercury from "../images/mercury-planet.png";
@@ -10,96 +10,77 @@ import imgUranus from "../images/uranus-planet.png";
 import imgVenus from "../images/venus-planet.png";
 
 export interface IPlanetSelectorProps {
+    onSelect: (name: string) => void
 }
 
-export function PlanetSelector(props: IPlanetSelectorProps) {
+const planetMap = [
+    {
+        name: 'moon',
+        img: imgMoon,
+    },
+    {
+        name: 'mercury',
+        img: imgMercury,
+    },
+    {
+        name: 'venus',
+        img: imgVenus,
+    },
+    {
+        name: 'mars',
+        img: imgMars,
+    },
+    {
+        name: 'jupiter',
+        img: imgJupiter,
+    },
+    {
+        name: 'saturn',
+        img: imgSaturn,
+    },
+    {
+        name: 'uranus',
+        img: imgUranus,
+    },
+    {
+        name: 'neptune',
+        img: imgNeptune,
+    },
+    {
+        name: 'pluto',
+        img: imgPluto,
+    },
+];
 
+export function PlanetSelector(props: IPlanetSelectorProps) {
+  const [selectedPlanet, setSelectedPlanet] = useState('');
   const onClickPlanet = (name: string) => {
-    console.log('onclick', name);
+    setSelectedPlanet(name);
+    props.onSelect(name);
   }
 
   return (
     <div className={'planet-selector'}>
-      <div
-        className={'planet'}
-        onClick={() => onClickPlanet('moon')}>
-        <img className={'image'} src={imgMoon} />
-        <div className={'details'}>
-          <span>Moon</span>
-        </div>
-      </div>
-
-      <div
-        className={'planet'}
-        onClick={() => onClickPlanet('mercury')}>
-        <img className={'image'} src={imgMercury} />
-        <div className={'details'}>
-          <span>Mercury</span>
-        </div>
-      </div>
-
-      <div
-        className={'planet'}
-        onClick={() => onClickPlanet('venus')}>
-        <img className={'image'} src={imgVenus} />
-        <div className={'details'}>
-          <span>Venus</span>
-        </div>
-      </div>
-
-      <div
-        className={'planet'}
-        onClick={() => onClickPlanet('mars')}>
-        <img className={'image'} src={imgMars} />
-        <div className={'details'}>
-          <span>Mars</span>
-        </div>
-      </div>
-
-      <div
-        className={'planet'}
-        onClick={() => onClickPlanet('jupiter')}>
-        <img className={'image'} src={imgJupiter} />
-        <div className={'details'}>
-          <span>Jupiter</span>
-        </div>
-      </div>
-
-      <div
-        className={'planet'}
-        onClick={() => onClickPlanet('saturn')}>
-        <img className={'image'} src={imgSaturn} />
-        <div className={'details'}>
-          <span>Saturn</span>
-        </div>
-      </div>
-
-      <div
-        className={'planet'}
-        onClick={() => onClickPlanet('uranus')}>
-        <img className={'image'} src={imgUranus} />
-        <div className={'details'}>
-          <span>Uranus</span>
-        </div>
-      </div>
-
-      <div
-        className={'planet'}
-        onClick={() => onClickPlanet('neptune')}>
-        <img className={'image'} src={imgNeptune} />
-        <div className={'details'}>
-          <span>Neptune</span>
-        </div>
-      </div>
-
-      <div
-        className={'planet'}
-        onClick={() => onClickPlanet('pluto')}>
-        <img className={'image'} src={imgPluto} />
-        <div className={'details'}>
-          <span>Pluto</span>
-        </div>
-      </div>
+        { planetMap.map((planet, index, ) => {
+            let className = 'planet';
+            if (selectedPlanet === planet.name) {
+                className += ' selected';
+            }
+            return (
+                <div
+                    key={index}
+                    className={className}
+                    onClick={() => onClickPlanet(planet.name)}>
+                    <img className={'image'}
+                         src={planet.img}
+                         alt={planet.name}
+                    />
+                    <div className={'details'}>
+                        <span>{planet.name}</span>
+                    </div>
+                </div>
+            )
+        })}
     </div>
   )
 }

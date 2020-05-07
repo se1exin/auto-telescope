@@ -35,6 +35,7 @@ class GPS(object):
         while self.updating:
             try:
                 result = str(serial_port.readline(), "utf-8")
+                # print(result)
                 if result.find("GGA") > 0:
                     msg = pynmea2.parse(result)
                     self.latitude = msg.latitude
@@ -47,8 +48,11 @@ class GPS(object):
 
                     self.has_position = True
 
+                    # Now we have a lock, just exit to free up resources
+                    self.updating = False
+
             except Exception as ex:
-                pass
                 # print(ex)
+                pass
 
         serial_port.close()

@@ -4,8 +4,7 @@ import time
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_socketio import SocketIO
-from skyfield.api import load
-from skyfield.toposlib import Topos
+
 from telescope.telescope import Telescope
 
 app = Flask(__name__)
@@ -60,6 +59,12 @@ def imu_stop():
     return jsonify({"success": telescope.imu_stop()})
 
 
+@app.route("/imu/mag/calibrate", methods=["POST"])
+def imu_mag_calibrate():
+    result = telescope.mag_calibrate()
+    return jsonify({"success": True, **result, })
+
+
 @app.route("/imu/mag/dump", methods=["POST"])
 def imu_mag_dump():
     """
@@ -76,7 +81,7 @@ def imu_mag_dump():
     time_step = 0.01
     sample_duration = int(15 / time_step)
     for _ in range(0, sample_duration):
-        mag_data = telescope.imu.mpu9250.raw_mag
+        mag_data = telescope.imu.mpu9250.readMagnetometerMaster()
         print(mag_data)
         if mag_data is not None:
             readings.append(mag_data)
@@ -115,8 +120,8 @@ def update_position():
     content = request.get_json()
     pos_x = content["x"]
     pos_y = 0.0  # @TODO: Implement Y axis (still needs hardware)
-
-    result = telescope.move_to_position(pos_x, pos_y)
+    method = content["method"] if "method" in content else 'stepper'
+    result = telescope.move_to_position(pos_x, method)
 
     return jsonify({"success": result})
 
@@ -124,7 +129,7 @@ def update_position():
 @app.route("/position/cancel", methods=["POST"])
 def cancel_position_update():
     # Flag that movement should stop. It will take a few seconds to stop.
-    telescope.moving_to_position = False
+    telescope.cancel_move_to_position()
 
     return jsonify({"success": True})
 
@@ -134,40 +139,26 @@ def update_rotate():
     content = request.get_json()
     pos_x = content["x"]
 
-    result = telescope._rotate_degrees(pos_x)
+    result = telescope.rotate_stepper_by_degrees(pos_x)
 
     return jsonify({"success": result})
 
 
-@app.route("/planet")
+@app.route("/planet", methods=["POST"])
 def move_to_planet():
-    planet_name = request.args.get("name")
-    lat = -33.8870539
-    lng = 151.1756034
-
-    ts = load.timescale()
-    t = ts.now()
-
-    planets = load("de421.bsp")
-    earth, target_planet = planets["earth"], planets[planet_name]
-
-    current_pos = earth + Topos(latitude_degrees=lat, longitude_degrees=lng)
-    current_pos_time = current_pos.at(t)
-
-    alt, az, d = current_pos_time.observe(target_planet).apparent().altaz()
-
-    pos_x = az.degrees
-    pos_y = alt.degrees
-
-    # Our servos can only move 180deg, so to reach and azimuth angle > 180
-    # we need to invert both the x and y
-    if pos_x > 180:
-        pos_x = pos_x - 180
-        pos_y = pos_y - 90
-
-    # send_position(pos_x, pos_y)
-
-    return jsonify({"x": pos_x, "y": pos_y, "_x": az.degrees, "_y": alt.degrees})
+    content = request.get_json()
+    planet_name = content["name"]
+    try:
+        result = telescope.move_to_astronomical_object(planet_name)
+        return jsonify({
+            "success": True,
+            **result,
+        })
+    except Exception as ex:
+        return jsonify({
+            "success": False,
+            "exception": repr(ex)
+        })
 
 
 if __name__ == "__main__":

@@ -1,10 +1,13 @@
 import threading
 import time
+from skyfield.api import load
+from skyfield.toposlib import Topos
 
 from hardware.easydriver import EasyDriver
 from hardware.gps import GPS
 from hardware.imu import IMU
 
+IMU_STABILITY_THRESHOLD = 0.8
 
 class Telescope(object):
     def __init__(self):
@@ -17,32 +20,36 @@ class Telescope(object):
             pin_sleep=10,
             pin_enable=9,
             pin_reset=11,
-            delay=0.005,
+            delay=0.001,
             gear_ratio=18,
         )
         self.gps = GPS()
-        self.imu = IMU()
+        self.imu = IMU(stability_threshold=IMU_STABILITY_THRESHOLD)
         self.imu.configure()
 
         # Gear ratio of X axis gear system
         self.gear_ratio_x = 18  # to 18:1
-        self.moving_to_position = False
+        self.moving_to_target = False
+        self.target_found = False
         self.target_position_x = 0.0
         self.target_position_y = 0.0
 
         self.started = False
+        self.target_object = ""
 
     def start(self):
         if not self.started:
             self.imu_calibrate()
             self.imu_start()
             self.gps_start()
+            self.stepper.disable()
             self.started = True
         return self.status()
 
     def status(self):
         # Overall status of all sensors and positions
         return {
+            "started": self.started,
             "imu_updating": self.imu.updating,
             "imu_has_position": self.imu.has_position,
             "imu_position_stable": self.imu.position_stable,
@@ -59,10 +66,12 @@ class Telescope(object):
             "latitude": self.gps.latitude,
             "longitude": self.gps.longitude,
             "declination": self.gps.declination,
-            "moving_to_position": self.moving_to_position,
+            "moving_to_target": self.moving_to_target,
+            "target_found": self.target_found,
             "target_position_x": self.target_position_x,
             "target_position_y": self.target_position_y,
-            "stepper_position": self.stepper.current_position,
+            "stepper_position": self.stepper.current_position % 360,
+            "mag_heading_raw": self.imu.mag_heading_raw + self.gps.declination,
         }
 
     # IMU functions
@@ -75,20 +84,20 @@ class Telescope(object):
         # To calibrate the mag we need to move the sensor around.
         # The best we can do is just spin the motor as fast as we can during calibration
         # self.stepper.enable()
-        # self.stepper.set_mode_full_step()
-
-        # Start calibration in another thread so we can rotate the motor in this thread.
+        # self.stepper.set_full_step()
+        #
+        # # Start calibration in another thread so we can rotate the motor in this thread.
         # x = threading.Thread(target=self.imu.calibrate_mag)
         # x.start()
-
+        #
         # while self.imu.is_calibrating_mag:
-        # 	self.stepper.step_forward()
-        # 	pass
-
-        # Mag calibration complete
+        #     self.stepper.step_forward()
+        #     time.sleep(0.001)
+        #
+        # # Mag calibration complete
         # self.stepper.disable()
-
-        # The rest of the sensors (accel, gyro) must be calibrated while not moving
+        #
+        # # The rest of the sensors (accel, gyro) must be calibrated while not moving
         # time.sleep(1)
         self.imu.calibrate_mpu()
 
@@ -96,7 +105,7 @@ class Telescope(object):
         self.imu.configure()
 
         return {
-            "magBias": self.imu.mpu9250.magBias,
+            "mbias": self.imu.mpu9250.mbias,
             "magScale": self.imu.mpu9250.magScale,
         }
 
@@ -112,55 +121,101 @@ class Telescope(object):
     def gps_stop(self):
         return self.gps.stop_updating()
 
-    def move_to_position(self, position_x, position_y):
-        if self.moving_to_position:
+    def mag_calibrate(self):
+        self.imu.calibrate_mag()
+        return {
+            "magBias": self.imu.mpu9250.magBias,
+            "magScale": self.imu.mpu9250.magScale,
+        }
+
+    def move_to_astronomical_object(self, object_name):
+        if not object_name:
+            raise Exception("Please provide valid object_name.")
+
+        if not self.started:
+            raise Exception("Telescope has not been initialised.")
+
+        if not self.gps.has_position:
+            raise Exception("Cannot target object without GPS position.")
+
+        if self.moving_to_target:
+            raise Exception("Another object is currently being targeted.")
+
+        try:
+            ts = load.timescale()
+            t = ts.now()
+
+            planets = load("de421.bsp")
+            earth, target_planet = planets["earth"], planets[object_name]
+
+            current_pos = earth + Topos(latitude_degrees=self.gps.latitude, longitude_degrees=self.gps.longitude)
+            current_pos_time = current_pos.at(t)
+
+            alt, az, d = current_pos_time.observe(target_planet).apparent().altaz()
+        except Exception as ex:
+            raise ex
+
+        self.move_to_position(az.degrees, method='stepper')
+        return {
+            "x": az.degrees,
+            "y": alt.degrees,
+        }
+
+    def cancel_move_to_position(self):
+        self.moving_to_target = False
+        self.target_found = False
+
+    def move_to_position(self, position, method='compass'):
+        if method == 'compass':
+            return self.move_to_compass_position(position)
+        else:
+            # Use the stepper step count rather than the compass to find the target
+            result = self.move_to_compass_position(0)
+            degrees = Telescope.degrees_between_points(self.stepper.current_position, position)
+            self.target_position_x = position
+            self.rotate_stepper_by_degrees(degrees, variable_speed=False)
+            return result
+
+    def move_to_compass_position(self, position, allowed_error_margin=IMU_STABILITY_THRESHOLD):
+        if self.moving_to_target:
             return False
 
-        self.target_position_x = position_x
-        self.target_position_y = position_y
-        self.moving_to_position = True
+        self.target_position_x = position
 
-        x = threading.Thread(
-            target=self._move_to_position, daemon=True, args=(position_x, position_y,)
-        )
-        x.start()
-        return True
-
-    def _move_to_position(self, position_x, position_y):
         # Mag algorithm can take a few seconds to stabilise after movement
         # To move to the target position, we first move to an estimated position,
         # then wait for stabilisation and see how far off we are.
         # We keep doing this until we hit the target
-        allowed_error_margin = 0.5  # Allowed error in degrees
+        self.moving_to_target = True
+        self.target_found = False
 
-        while not self.imu.position_stable:
-            time.sleep(1)
+        while self.moving_to_target:
+            while not self.imu.position_stable:
+                if not self.moving_to_target:
+                    break  # Don't block cancellation requests
+                time.sleep(0.1)
 
-        while self.moving_to_position:
             mag_pos = self._normalise_yaw(self.imu.yaw_smoothed)
-            degrees = self._degrees_between_points(mag_pos, position_x)
+            degrees = self.degrees_between_points(mag_pos, position)
 
             self.stepper.current_position = mag_pos
 
-            print("Are we there yet?", mag_pos, position_x, degrees, abs(degrees))
-            if abs(degrees) <= allowed_error_margin:
-                self.moving_to_position = False
-                return
+            print("Are we there yet?", mag_pos, position, degrees, abs(degrees))
+            if abs(degrees) > allowed_error_margin:
+                self.rotate_stepper_by_degrees(degrees)
+            else:
+                break
 
-            self._rotate_stepper_by_degrees(degrees)
+        self.moving_to_target = False
+        self.target_found = True
+        return True
 
-            time.sleep(1)  # Wait for mag stabilisation
-            while not self.imu.position_stable:
-                time.sleep(3)
-
-        self.moving_to_position = False
-
-    def _rotate_stepper_by_degrees(self, degrees):
-        self.stepper.enable()
+    def rotate_stepper_by_degrees(self, degrees, variable_speed=True):
         degrees_abs = abs(degrees)
 
+        self.stepper.enable()
         # As the distance gets smaller, slow down the motor speed and time between rotation/stabilisation attempts
-        if degrees_abs < 15:
+        if degrees_abs < 15 or not variable_speed:
             self.stepper.set_eighth_step()
         elif degrees_abs < 60:
             self.stepper.set_quarter_step()
@@ -170,7 +225,6 @@ class Telescope(object):
             self.stepper.set_full_step()
 
         num_steps_required = degrees_abs / self.stepper.degrees_per_step()
-        print("STEPS REQUIRED", num_steps_required)
 
         for i in range(0, int(num_steps_required)):
             if degrees < 0:
@@ -188,7 +242,8 @@ class Telescope(object):
             return 360 - abs(yaw)
         return yaw
 
-    def _degrees_between_points(self, current_pos, target_pos):
+    @staticmethod
+    def degrees_between_points(current_pos, target_pos):
         """
         Calculate the shortest distance between two points on a circle
         """

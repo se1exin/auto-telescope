@@ -1,0 +1,56 @@
+// IMU Module Service Interface
+
+syntax = "proto3";
+
+package imu;
+
+option java_multiple_files = true;
+option java_package = "com.selexin.autotelescope";
+option java_outer_classname = "ImuProto";
+
+service ImuService {
+  // Configure/Initialize the IMU sensor
+  rpc Configure(EmptyRequest) returns (EmptyResponse) {}
+
+  // Calibrate the Mag sensor
+  rpc CalibrateMag(EmptyRequest) returns (StatusResponse) {}
+
+  // Calibrate the MPU sensors
+  rpc CalibrateMPU(EmptyRequest) returns (StatusResponse) {}
+
+  // Get the updating and position lock status of the GPS module
+  rpc GetStatus(EmptyRequest) returns (StatusResponse) {}
+
+  // Get the current GPS position
+  rpc GetPosition(EmptyRequest) returns (PositionResponse) {}
+
+  // Signal the IMU module to start updating
+  rpc StartUpdating(EmptyRequest) returns (StatusResponse) {}
+
+  // Signal the GPS module to stop
+  rpc StopUpdating(EmptyRequest) returns (StatusResponse) {}
+}
+
+message EmptyRequest {}
+message EmptyResponse {}
+
+message PositionResponse {
+  float roll_raw = 1;
+  float pitch_raw = 2;
+  float yaw_raw = 3;
+  float roll_filtered = 4;
+  float pitch_filtered = 5;
+  float yaw_filtered = 6;
+  float roll_smoothed = 7;
+  float pitch_smoothed = 8;
+  float yaw_smoothed = 9;
+}
+
+message StatusResponse {
+  bool is_updating = 1;
+  bool has_position = 2;
+  bool position_stable = 3;
+  bool is_mag_calibrating = 4;
+  bool mag_calibrated = 5;
+  bool mpu_calibrated = 6;
+}

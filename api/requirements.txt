@@ -4,6 +4,9 @@ click==7.1.1
 cycler==0.10.0
 Flask==1.1.2
 Flask-Cors==3.0.8
+Flask-SocketIO==4.3.0
+grpcio==1.28.1
+grpcio-tools==1.28.1
 itsdangerous==1.1.0
 Jinja2==2.11.2
 jplephem==2.14
@@ -13,11 +16,11 @@ matplotlib==3.2.1
 mpu9250-jmdev==1.0.10
 numpy==1.18.3
 pkg-resources==0.0.0
-pyIGRF==0.3.1
-pynmea2==1.15.0
+protobuf==3.11.3
 pyparsing==2.4.7
-pyserial==3.4
 python-dateutil==2.8.1
+python-engineio==3.12.1
+python-socketio==4.5.1
 RPi.GPIO==0.7.0
 scipy==1.4.1
 sgp4==2.7

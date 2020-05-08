@@ -1,0 +1,40 @@
+// GPS Module Service Interface
+
+syntax = "proto3";
+
+package gps;
+
+option java_multiple_files = true;
+option java_package = "com.selexin.autotelescope";
+option java_outer_classname = "GpsProto";
+
+service GpsService {
+  // Get the updating and position lock status of the GPS module
+  rpc GetStatus(EmptyRequest) returns (StatusResponse) {}
+
+  // Get the current GPS position
+  rpc GetPosition(EmptyRequest) returns (PositionResponse) {}
+
+  // Signal the GPS module to start updating
+  rpc StartUpdating(StartRequest) returns (StatusResponse) {}
+
+  // Signal the GPS module to stop
+  rpc StopUpdating(EmptyRequest) returns (StatusResponse) {}
+}
+
+message EmptyRequest {}
+
+message StartRequest {
+  bool stop_when_found = 1;
+}
+
+message PositionResponse {
+  float latitude = 1;
+  float longitude = 2;
+  float declination = 3;
+}
+
+message StatusResponse {
+  bool is_updating = 1;
+  bool has_position = 2;
+}

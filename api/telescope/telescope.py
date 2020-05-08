@@ -4,10 +4,17 @@ from skyfield.api import load
 from skyfield.toposlib import Topos
 
 from hardware.easydriver import EasyDriver
-from hardware.gps import GPS
 from hardware.imu import IMU
 
+
+import grpc
+import gps_pb2
+import gps_pb2_grpc
+
 IMU_STABILITY_THRESHOLD = 0.8
+
+GPS_SERVICE_ADDRESS = "localhost:50051"
+
 
 class Telescope(object):
     def __init__(self):
@@ -23,7 +30,6 @@ class Telescope(object):
             delay=0.001,
             gear_ratio=18,
         )
-        self.gps = GPS()
         self.imu = IMU(stability_threshold=IMU_STABILITY_THRESHOLD)
         self.imu.configure()
 
@@ -48,6 +54,9 @@ class Telescope(object):
 
     def status(self):
         # Overall status of all sensors and positions
+        gps_status = self.gps_status()
+        gps_position = self.gps_position()
+
         return {
             "started": self.started,
             "imu_updating": self.imu.updating,
@@ -61,17 +70,17 @@ class Telescope(object):
             "yaw_normalised": self._normalise_yaw(self.imu.yaw),
             "roll": self.imu.roll,
             "pitch": self.imu.pitch,
-            "gps_updating": self.gps.updating,
-            "gps_has_position": self.gps.has_position,
-            "latitude": self.gps.latitude,
-            "longitude": self.gps.longitude,
-            "declination": self.gps.declination,
+            "gps_updating": gps_status.is_updating,
+            "gps_has_position": gps_status.has_position,
+            "latitude": gps_position.latitude,
+            "longitude": gps_position.longitude,
+            "declination": gps_position.declination,
             "moving_to_target": self.moving_to_target,
             "target_found": self.target_found,
             "target_position_x": self.target_position_x,
             "target_position_y": self.target_position_y,
             "stepper_position": self.stepper.current_position % 360,
-            "mag_heading_raw": self.imu.mag_heading_raw + self.gps.declination,
+            "mag_heading_raw": self.imu.mag_heading_raw + gps_position.declination,
         }
 
     # IMU functions
@@ -116,10 +125,24 @@ class Telescope(object):
         return self.imu.stop_updating()
 
     def gps_start(self):
-        return self.gps.start_updating()
+        with grpc.insecure_channel(GPS_SERVICE_ADDRESS) as channel:
+            stub = gps_pb2_grpc.GpsServiceStub(channel)
+            stub.StartUpdating(gps_pb2.StartRequest(stop_when_found=True))
 
     def gps_stop(self):
-        return self.gps.stop_updating()
+        with grpc.insecure_channel(GPS_SERVICE_ADDRESS) as channel:
+            stub = gps_pb2_grpc.GpsServiceStub(channel)
+            stub.StopUpdating(gps_pb2.EmptyRequest())
+
+    def gps_status(self):
+        with grpc.insecure_channel(GPS_SERVICE_ADDRESS) as channel:
+            stub = gps_pb2_grpc.GpsServiceStub(channel)
+            return stub.GetStatus(gps_pb2.EmptyRequest())
+
+    def gps_position(self):
+        with grpc.insecure_channel(GPS_SERVICE_ADDRESS) as channel:
+            stub = gps_pb2_grpc.GpsServiceStub(channel)
+            return stub.GetPosition(gps_pb2.EmptyRequest())
 
     def mag_calibrate(self):
         self.imu.calibrate_mag()
@@ -135,7 +158,7 @@ class Telescope(object):
         if not self.started:
             raise Exception("Telescope has not been initialised.")
 
-        if not self.gps.has_position:
+        if not self.gps_status().has_position:
             raise Exception("Cannot target object without GPS position.")
 
         if self.moving_to_target:
@@ -148,14 +171,17 @@ class Telescope(object):
             planets = load("de421.bsp")
             earth, target_planet = planets["earth"], planets[object_name]
 
-            current_pos = earth + Topos(latitude_degrees=self.gps.latitude, longitude_degrees=self.gps.longitude)
+            current_pos = earth + Topos(
+                latitude_degrees=self.gps_position().latitude,
+                longitude_degrees=self.gps_position().longitude,
+            )
             current_pos_time = current_pos.at(t)
 
             alt, az, d = current_pos_time.observe(target_planet).apparent().altaz()
         except Exception as ex:
             raise ex
 
-        self.move_to_position(az.degrees, method='stepper')
+        self.move_to_position(az.degrees, method="stepper")
         return {
             "x": az.degrees,
             "y": alt.degrees,
@@ -165,18 +191,22 @@ class Telescope(object):
         self.moving_to_target = False
         self.target_found = False
 
-    def move_to_position(self, position, method='compass'):
-        if method == 'compass':
+    def move_to_position(self, position, method="compass"):
+        if method == "compass":
             return self.move_to_compass_position(position)
         else:
             # Use the stepper step count rather than the compass to find the target
             result = self.move_to_compass_position(0)
-            degrees = Telescope.degrees_between_points(self.stepper.current_position, position)
+            degrees = Telescope.degrees_between_points(
+                self.stepper.current_position, position
+            )
             self.target_position_x = position
             self.rotate_stepper_by_degrees(degrees, variable_speed=False)
             return result
 
-    def move_to_compass_position(self, position, allowed_error_margin=IMU_STABILITY_THRESHOLD):
+    def move_to_compass_position(
+        self, position, allowed_error_margin=IMU_STABILITY_THRESHOLD
+    ):
         if self.moving_to_target:
             return False
 
@@ -237,7 +267,7 @@ class Telescope(object):
     def _normalise_yaw(self, yaw):
         # Yaw is from -180 to +180. 0 == North.
         # Convert to 0 -> 360 degrees
-        yaw += self.gps.declination
+        yaw += self.gps_position().declination
         if yaw < 0:
             return 360 - abs(yaw)
         return yaw

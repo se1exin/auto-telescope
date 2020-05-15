@@ -57,6 +57,14 @@ class Telescope(object):
         gps_status = self.gps_status()
         gps_position = self.gps_position()
 
+        gps = {
+            "latitude": gps_position.latitude,
+            "longitude": gps_position.longitude,
+            "declination": gps_position.declination,
+            "is_updating": gps_status.is_updating,
+            "has_position": gps_status.has_position,
+        }
+
         return {
             "started": self.started,
             "imu_updating": self.imu.updating,
@@ -70,17 +78,15 @@ class Telescope(object):
             "yaw_normalised": self._normalise_yaw(self.imu.yaw),
             "roll": self.imu.roll,
             "pitch": self.imu.pitch,
-            "gps_updating": gps_status.is_updating,
-            "gps_has_position": gps_status.has_position,
-            "latitude": gps_position.latitude,
-            "longitude": gps_position.longitude,
-            "declination": gps_position.declination,
+
             "moving_to_target": self.moving_to_target,
             "target_found": self.target_found,
             "target_position_x": self.target_position_x,
             "target_position_y": self.target_position_y,
             "stepper_position": self.stepper.current_position % 360,
             "mag_heading_raw": self.imu.mag_heading_raw + gps_position.declination,
+
+            "gps": gps
         }
 
     # IMU functions
@@ -171,9 +177,11 @@ class Telescope(object):
             planets = load("de421.bsp")
             earth, target_planet = planets["earth"], planets[object_name]
 
+            gps_position = self.gps_position()
+
             current_pos = earth + Topos(
-                latitude_degrees=self.gps_position().latitude,
-                longitude_degrees=self.gps_position().longitude,
+                latitude_degrees=gps_position.latitude,
+                longitude_degrees=gps_position.longitude,
             )
             current_pos_time = current_pos.at(t)
 

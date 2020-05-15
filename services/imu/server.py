@@ -6,11 +6,10 @@ from collections import deque
 from concurrent import futures
 
 import numpy
-import grpc
 
+import grpc
 import imu_pb2
 import imu_pb2_grpc
-
 from ahrs.common import DEG2RAD, RAD2DEG
 from ahrs.common.orientation import q2euler
 from ahrs.filters import Madgwick, Mahony
@@ -25,6 +24,7 @@ formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
+
 class ImuServiceServicer(imu_pb2_grpc.ImuServiceServicer):
     def __init__(self):
         self.mpu9250 = MPU9250(
@@ -35,7 +35,7 @@ class ImuServiceServicer(imu_pb2_grpc.ImuServiceServicer):
             gfs=GFS_1000,
             afs=AFS_8G,
             mfs=AK8963_BIT_16,
-            mode=AK8963_MODE_C100HZ
+            mode=AK8963_MODE_C100HZ,
         )
 
         # Status Values
@@ -55,6 +55,7 @@ class ImuServiceServicer(imu_pb2_grpc.ImuServiceServicer):
         self.yaw_filtered = 0.0
         self.roll_smoothed = 0.0
         self.pitch_smoothed = 0.0
+        self.yaw_smoothed = 0.0
 
         # How many degrees of variance can be tolerated in stability detection?
         self.stability_threshold = 0.5
@@ -108,6 +109,7 @@ class ImuServiceServicer(imu_pb2_grpc.ImuServiceServicer):
     def Configure(self, request, context):
         logger.debug("Configure()")
         self.mpu9250.configure()
+        return imu_pb2.EmptyResponse()
 
     def CalibrateMag(self, request, context):
         logger.debug("CalibrateMag()")
@@ -130,11 +132,9 @@ class ImuServiceServicer(imu_pb2_grpc.ImuServiceServicer):
 
     def StartUpdating(self, request, context):
         logger.debug("StartUpdating()")
-        if self.is_updating:
-            return False
-
-        x = threading.Thread(target=self._update_loop, daemon=True)
-        x.start()
+        if not self.is_updating:
+            x = threading.Thread(target=self._update_loop, daemon=True)
+            x.start()
         return self._get_status()
 
     def _update_loop(self):
@@ -148,34 +148,42 @@ class ImuServiceServicer(imu_pb2_grpc.ImuServiceServicer):
 
         self.is_updating = True
         while self.is_updating:
-            accel = self.mpu9250.readAccelerometerMaster()
-            gyro = list(map(lambda x: x * DEG2RAD, self.mpu9250.readGyroscopeMaster()))
-            mag = self.mpu9250.readMagnetometerMaster()
-            self.yaw_raw = math.atan2(-mag[1], mag[0]) * RAD2DEG
-            # @TODO: Roll and Pitch raw headings
-            q = filter.updateMARG(acc=accel, gyr=gyro, mag=[mag[0], -mag[1], mag[2]], q=q)
+            try:
+                accel = self.mpu9250.readAccelerometerMaster()
+                gyro = list(
+                    map(lambda x: x * DEG2RAD, self.mpu9250.readGyroscopeMaster())
+                )
+                mag = self.mpu9250.readMagnetometerMaster()
+                self.yaw_raw = math.atan2(-mag[1], mag[0]) * RAD2DEG
+                # @TODO: Roll and Pitch raw headings
+                q = filter.updateMARG(
+                    acc=accel, gyr=gyro, mag=[mag[0], -mag[1], mag[2]], q=q
+                )
 
-            attitude = q2euler(q)
-            self.roll_filtered = attitude[0] * RAD2DEG
-            self.pitch_filtered = attitude[1] * RAD2DEG
-            self.yaw_filtered = attitude[2] * RAD2DEG
+                attitude = q2euler(q)
+                self.roll_filtered = attitude[0] * RAD2DEG
+                self.pitch_filtered = attitude[1] * RAD2DEG
+                self.yaw_filtered = attitude[2] * RAD2DEG
 
-            self.has_position = True
+                self.has_position = True
 
-            # Low pass filter for yaw readings
-            # Also used to determine if the current yaw reading is 'stable' or not
-            yaw_readings.append(self.yaw)
-            if len(yaw_readings) >= yaw_buffer_size:
-                yaw_readings.popleft()
+                # Low pass filter for yaw readings
+                # Also used to determine if the current yaw reading is 'stable' or not
+                yaw_readings.append(self.yaw_filtered)
+                if len(yaw_readings) >= yaw_buffer_size:
+                    yaw_readings.popleft()
 
-                yaw_numpy = numpy.array(yaw_readings)
-                self.yaw_smoothed = yaw_numpy.mean()
-                self.position_stable = True if (yaw_numpy.std() < self.stability_threshold) else False
-            else:
-                self.position_stable = False
+                    yaw_numpy = numpy.array(yaw_readings)
+                    self.yaw_smoothed = yaw_numpy.mean()
+                    self.position_stable = (
+                        True if (yaw_numpy.std() < self.stability_threshold) else False
+                    )
+                else:
+                    self.position_stable = False
+            except Exception as ex:
+                logger.error(ex)
 
             # @TODO: Roll and Pitch smoothed headings
-
             time.sleep(0.0001)
 
         # We have stopped updating, reset everything back to zero/off
@@ -189,6 +197,7 @@ class ImuServiceServicer(imu_pb2_grpc.ImuServiceServicer):
         self.yaw_filtered = 0.0
         self.roll_smoothed = 0.0
         self.pitch_smoothed = 0.0
+        self.yaw_smoothed = 0.0
 
 
 def serve():

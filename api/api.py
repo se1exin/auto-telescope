@@ -18,8 +18,6 @@ telescope = Telescope()
 def start():
     if not telescope.started:
         telescope.start()
-        x = threading.Thread(target=status_emitter, daemon=True)
-        x.start()
 
     status = telescope.status()
     return jsonify({"success": True, **status,})
@@ -162,4 +160,6 @@ def move_to_planet():
 
 
 if __name__ == "__main__":
+    x = threading.Thread(target=status_emitter, daemon=True)
+    x.start()
     socketio.run(app, host="0.0.0.0", port=8080)

@@ -22,7 +22,6 @@ logger.addHandler(ch)
 
 class GpsServiceServicer(gps_pb2_grpc.GpsServiceServicer):
     def __init__(self):
-        self.serial_address = serial_address
         self.latitude = 0
         self.longitude = 0
         self.has_position = False
@@ -30,14 +29,14 @@ class GpsServiceServicer(gps_pb2_grpc.GpsServiceServicer):
         self.declination = 0.0
         self.serial_port = serial.Serial("/dev/ttyS0", 9600, timeout=0.5)
 
-    def _get_status(self, request, context):
+    def _get_status(self):
         return gps_pb2.StatusResponse(
             is_updating=self.is_updating, has_position=self.has_position
         )
 
     def GetStatus(self, request, context):
         logger.debug("GetStatus()")
-        self._get_status()
+        return self._get_status()
 
     def GetPosition(self, request, context):
         logger.debug("GetPosition()")
@@ -49,19 +48,17 @@ class GpsServiceServicer(gps_pb2_grpc.GpsServiceServicer):
 
     def StartUpdating(self, request, context):
         logger.debug("StartUpdating()")
-        if self.is_updating:
-            return False
-
-        x = threading.Thread(
-            target=self._update_loop, args=(request.stop_when_found,), daemon=True
-        )
-        x.start()
-        return self.GetStatus(request, context)
+        if not self.is_updating:
+            x = threading.Thread(
+                target=self._update_loop, args=(request.stop_when_found,), daemon=True
+            )
+            x.start()
+        return self._get_status()
 
     def StopUpdating(self, request, context):
         logger.debug("StopUpdating()")
         self.is_updating = False
-        return self.GetStatus(request, context)
+        return self._get_status()
 
     def _update_loop(self, stop_when_found=False):
         self.is_updating = True

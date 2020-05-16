@@ -7,66 +7,86 @@ import {StatusBar} from "./components/StatusBar";
 import {FlyWheel} from "./components/FlyWheel";
 import {PlanetSelector} from "./components/PlanetSelector";
 
-export interface ITelescopeStatus {
-  declination: number
-  gps_has_position: boolean
-  gps_updating: boolean
-  imu_calibrated: boolean
-  imu_has_position: boolean
-  imu_position_stable: boolean
-  imu_updating: boolean
+interface IGPSStatus {
   latitude: number
   longitude: number
+  declination: number
+  is_updating: boolean
+  has_position: boolean
+}
+
+interface IIMUStatus {
+  is_updating: boolean
+  has_position: boolean
+  position_stable: boolean
+  imu_calibrated: boolean
   mag_calibrated: boolean
-  mag_heading_raw: number
-  moving_to_target: boolean
   mpu_calibrated: boolean
-  pitch: number
-  roll: number
+  roll_raw: number
+  pitch_raw: number
+  yaw_raw: number
+  roll_filtered: number
+  pitch_filtered: number
+  yaw_filtered: number
+  roll_smoothed: number
+  pitch_smoothed: number
+  yaw_smoothed: number
+}
+
+export interface ITelescopeStatus {
+  gps: IGPSStatus
+  imu: IIMUStatus
+  moving_to_target: boolean
   success: boolean
   started: boolean
   stepper_position: number
   target_position_x: number
   target_position_y: number
   target_found: boolean
-  yaw: number
-  yaw_normalised: number
-  yaw_smoothed: number
 }
 
 const API_ADDRESS = "http://10.1.1.19:8080";
 const socket = io(API_ADDRESS);
 const initialStatus: ITelescopeStatus = {
-  declination: 0,
-  gps_has_position: false,
-  gps_updating: false,
-  imu_calibrated: false,
-  imu_has_position: false,
-  imu_position_stable: false,
-  imu_updating: false,
-  latitude: 0,
-  longitude: 0,
-  mag_calibrated: false,
-  mag_heading_raw: 0,
+  gps: {
+    latitude: 0,
+    longitude: 0,
+    declination: 0,
+    is_updating: false,
+    has_position: false,
+  },
+  imu: {
+    is_updating: false,
+    has_position: false,
+    position_stable: false,
+    imu_calibrated: false,
+    mag_calibrated: false,
+    mpu_calibrated: false,
+    roll_raw: 0.0,
+    pitch_raw: 0.0,
+    yaw_raw: 0.0,
+    roll_filtered: 0.0,
+    pitch_filtered: 0.0,
+    yaw_filtered: 0.0,
+    roll_smoothed: 0.0,
+    pitch_smoothed: 0.0,
+    yaw_smoothed: 0.0,
+  },
   moving_to_target: false,
-  mpu_calibrated: false,
-  pitch: 0,
-  roll: 0,
   success: false,
   started: false,
   stepper_position: 0,
   target_position_x: 0,
   target_position_y: 0,
   target_found: false,
-  yaw: 0,
-  yaw_normalised: 0,
-  yaw_smoothed: 0
 }
 
 function App() {
   let [socketConnected, setSocketConnected] = useState(false);
 
   let [status, setStatus] = useState<ITelescopeStatus>(initialStatus);
+
+  const [selectedPlanet, setSelectedPlanet] = useState('');
 
   useEffect(() => {
     socket.on('connect', () => setSocketConnected(true));
@@ -103,6 +123,9 @@ function App() {
     axios.post(`${API_ADDRESS}/position`, {'x': position}).then(result => {
       console.log(result);
       setPositionDisabled(false);
+      if (result.data.exception) {
+        alert(result.data.exception);
+      }
     }).catch(() => {
       setPositionDisabled(false);
     })
@@ -113,10 +136,13 @@ function App() {
   }
 
   const onSelectPlanet = (name: string) => {
-    console.log('planet', name);
     axios.post(`${API_ADDRESS}/planet`, {'name': name}).then(result => {
-      console.log(result);
       setPositionDisabled(false);
+      if (result.data.success) {
+        setSelectedPlanet(name);
+      } else if (result.data.exception) {
+        alert(result.data.exception);
+      }
     }).catch(() => {
       setPositionDisabled(false);
     })
@@ -126,11 +152,11 @@ function App() {
     <div className="app">
       <StatusBar
         connected={socketConnected}
-        gps_has_position={status.gps_has_position}
-        gps_updating={status.gps_updating}
-        imu_has_position={status.imu_has_position}
-        imu_position_stable={status.imu_position_stable}
-        imu_updating={status.imu_updating}
+        gps_has_position={status.gps.has_position}
+        gps_updating={status.gps.is_updating}
+        imu_has_position={status.imu.has_position}
+        imu_position_stable={status.imu.position_stable}
+        imu_updating={status.imu.is_updating}
         moving_to_target={status.moving_to_target}
         started={status.started}
         target_found={status.target_found}
@@ -138,13 +164,16 @@ function App() {
 
       <div className={'main'}>
         <FlyWheel
-            current_pos={status.yaw_normalised}
+            current_pos={status.imu.yaw_filtered}
             estimated_pos={status.stepper_position}
-            raw_pos={status.mag_heading_raw}
-            smoothed_pos={status.yaw_smoothed}
+            raw_pos={status.imu.yaw_raw}
+            smoothed_pos={status.imu.yaw_smoothed}
             target_pos={status.target_position_x}
         />
-        <PlanetSelector onSelect={onSelectPlanet} />
+        <PlanetSelector
+            onSelect={onSelectPlanet}
+            selectedPlanet={selectedPlanet}
+        />
       </div>
 
       <div className={'control-bar'}>

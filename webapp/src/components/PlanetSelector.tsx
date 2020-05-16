@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React from 'react';
 import imgJupiter from "../images/jupiter-planet.png";
 import imgMars from "../images/mars-planet.png";
 import imgMercury from "../images/mercury-planet.png";
@@ -11,6 +11,7 @@ import imgVenus from "../images/venus-planet.png";
 
 export interface IPlanetSelectorProps {
     onSelect: (name: string) => void
+    selectedPlanet: string
 }
 
 const planetMap = [
@@ -53,9 +54,8 @@ const planetMap = [
 ];
 
 export function PlanetSelector(props: IPlanetSelectorProps) {
-  const [selectedPlanet, setSelectedPlanet] = useState('');
+
   const onClickPlanet = (name: string) => {
-    setSelectedPlanet(name);
     props.onSelect(name);
   }
 
@@ -63,7 +63,7 @@ export function PlanetSelector(props: IPlanetSelectorProps) {
     <div className={'planet-selector'}>
         { planetMap.map((planet, index, ) => {
             let className = 'planet';
-            if (selectedPlanet === planet.name) {
+            if (props.selectedPlanet === planet.name) {
                 className += ' selected';
             }
             return (

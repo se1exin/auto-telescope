@@ -5,6 +5,12 @@ $color-success: #00A878;
 $color-white: #EAF2E3;
 $color-black: #333745;
 
+$color-flywheel-target: #1B065E;
+$color-flywheel-estimated: #00A1E4;
+$color-flywheel-smoothed: #DC0073;
+$color-flywheel-current: #F5B700;
+$color-flywheel-raw: #89FC00;
+
 html,
 body {
   height: 100%;
@@ -92,14 +98,14 @@ button {
       // transition: transform 0.3s;
 
       &.target-pos {
-        background-color: #1B065E;
+        background-color: $color-flywheel-target;
       }
       &.estimated-pos {
         height: 45%;
         top: 5%;
         width: 10px;
         left: calc(50% - 5px);
-        background-color: #00A1E4;
+        background-color: $color-flywheel-estimated;
       }
 
       &.smoothed-pos {
@@ -107,7 +113,7 @@ button {
         top: 10%;
         width: 8px;
         left: calc(50% - 4px);
-        background-color: #DC0073;
+        background-color: $color-flywheel-smoothed;
       }
 
       &.current-pos {
@@ -115,7 +121,7 @@ button {
         top: 15%;
         width: 6px;
         left: calc(50% - 3px);
-        background-color: #F5B700;
+        background-color: $color-flywheel-current;
       }
 
       &.raw-pos {
@@ -123,43 +129,68 @@ button {
         top: 20%;
         width: 4px;
         left: calc(50% - 2px);
-        background-color: #89FC00;
+        background-color: $color-flywheel-raw;
       }
     }
   }
   .text {
-    text-align: right;
-    .value:before {
-      content: '';
-      display: inline-block;
-      margin-right: 5px;
-      border-radius: 5px;
-      width: 10px;
-      height: 10px;
+    display: flex;
+    justify-content: flex-end;
+    line-height: 1.2rem;
+
+    .value {
+      position: relative;
+      width: 75px;
+      text-align: right;
+      margin-left: 5px;
+
+      &:after {
+        content: '';
+        display: inline-block;
+        margin-left: 10px;
+        border-radius: 5px;
+        width: 10px;
+        height: 10px;
+      }
     }
     &.target-pos {
-      .value:before {
-        background-color: #1B065E;
+      .value {
+        color: $color-flywheel-target;
+        &:after {
+          background-color: $color-flywheel-target;
+        }
       }
     }
     &.estimated-pos {
-      .value:before {
-        background-color: #00A1E4;
+      .value {
+        color: $color-flywheel-estimated;
+        &:after {
+          background-color: $color-flywheel-estimated;
+        }
       }
     }
     &.raw-pos {
-      .value:before {
-        background-color: #89FC00;
+      .value {
+        color: $color-flywheel-raw;
+        &:after {
+          background-color: $color-flywheel-raw;
+        }
       }
     }
     &.smoothed-pos {
-      .value:before {
-        background-color: #DC0073;
+      .value {
+        color: $color-flywheel-smoothed;
+        &:after {
+          background-color: $color-flywheel-smoothed;
+        }
       }
     }
     &.current-pos {
-      .value:before {
-        background-color: #F5B700;
+      .value {
+        color: $color-flywheel-current;
+        &:after {
+          background-color: $color-flywheel-current;
+        }
       }
     }
   }

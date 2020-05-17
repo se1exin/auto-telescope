@@ -43,8 +43,8 @@ def get_status():
 
 @app.route("/imu/calibrate", methods=["POST"])
 def imu_calibrate():
-    result = telescope.imu_calibrate()
-    return jsonify({"success": True, **result})
+    telescope.imu_calibrate()
+    return jsonify({"success": True})
 
 
 @app.route("/imu/start", methods=["POST"])
@@ -56,11 +56,11 @@ def imu_start():
 def imu_stop():
     return jsonify({"success": telescope.imu_stop()})
 
-
-@app.route("/imu/mag/calibrate", methods=["POST"])
-def imu_mag_calibrate():
-    result = telescope.mag_calibrate()
-    return jsonify({"success": True, **result, })
+#
+# @app.route("/imu/mag/calibrate", methods=["POST"])
+# def imu_mag_calibrate():
+#     result = telescope.mag_calibrate()
+#     return jsonify({"success": True, **result, })
 
 
 @app.route("/imu/mag/dump", methods=["POST"])
@@ -155,7 +155,7 @@ def move_to_planet():
     except Exception as ex:
         return jsonify({
             "success": False,
-            "exception": repr(ex)
+            "exception": str(ex)
         })
 
 

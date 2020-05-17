@@ -24,6 +24,8 @@ formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
+SERVICE_PORT = 50052
+
 
 class ImuServiceServicer(imu_pb2_grpc.ImuServiceServicer):
     def __init__(self):
@@ -58,9 +60,10 @@ class ImuServiceServicer(imu_pb2_grpc.ImuServiceServicer):
         self.yaw_smoothed = 0.0
 
         # How many degrees of variance can be tolerated in stability detection?
-        self.stability_threshold = 0.5
+        self.stability_threshold = 0.5  # @TODO: Make configurable
 
         # Manual Mag Calibration
+        # @TODO: Make configurable
         self.mpu9250.mbias = [
             20.7454594017094,
             10.134935897435899,
@@ -203,7 +206,7 @@ class ImuServiceServicer(imu_pb2_grpc.ImuServiceServicer):
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     imu_pb2_grpc.add_ImuServiceServicer_to_server(ImuServiceServicer(), server)
-    server.add_insecure_port("[::]:50051")
+    server.add_insecure_port("[::]:%s" % SERVICE_PORT)
     server.start()
     server.wait_for_termination()
 

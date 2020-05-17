@@ -1,19 +1,20 @@
 import threading
 import time
+
+import gps_pb2
+import gps_pb2_grpc
+import grpc
+import imu_pb2
+import imu_pb2_grpc
+from hardware.easydriver import EasyDriver
+from hardware.imu import IMU
 from skyfield.api import load
 from skyfield.toposlib import Topos
 
-from hardware.easydriver import EasyDriver
-from hardware.imu import IMU
-
-
-import grpc
-import gps_pb2
-import gps_pb2_grpc
-
-IMU_STABILITY_THRESHOLD = 0.8
-
 GPS_SERVICE_ADDRESS = "localhost:50051"
+IMU_SERVICE_ADDRESS = "localhost:50052"
+
+IMU_STABILITY_THRESHOLD = 0.5  # @TODO: This currently matches the value in imu service. Need to make customisable.
 
 
 class Telescope(object):
@@ -30,8 +31,8 @@ class Telescope(object):
             delay=0.001,
             gear_ratio=18,
         )
-        self.imu = IMU(stability_threshold=IMU_STABILITY_THRESHOLD)
-        self.imu.configure()
+
+        self.imu_configure()
 
         # Gear ratio of X axis gear system
         self.gear_ratio_x = 18  # to 18:1
@@ -56,6 +57,8 @@ class Telescope(object):
         # Overall status of all sensors and positions
         gps_status = self.gps_status()
         gps_position = self.gps_position()
+        imu_status = self.imu_status()
+        imu_position = self.imu_position()
 
         gps = {
             "latitude": gps_position.latitude,
@@ -65,36 +68,46 @@ class Telescope(object):
             "has_position": gps_status.has_position,
         }
 
+        imu = {
+            "is_updating": imu_status.is_updating,
+            "has_position": imu_status.has_position,
+            "position_stable": imu_status.position_stable,
+            "mag_calibrated": imu_status.mag_calibrated,
+            "mpu_calibrated": imu_status.mpu_calibrated,
+            "imu_calibrated": imu_status.mag_calibrated and imu_status.mpu_calibrated,
+            "roll_raw": imu_position.roll_raw,
+            "pitch_raw": imu_position.pitch_raw,
+            "yaw_raw": imu_position.yaw_raw + gps_position.declination,
+            "roll_filtered": imu_position.roll_filtered,
+            "pitch_filtered": imu_position.pitch_filtered,
+            "yaw_filtered": self._normalise_yaw(imu_position.yaw_filtered),
+            "roll_smoothed": imu_position.roll_smoothed,
+            "pitch_smoothed": imu_position.pitch_smoothed,
+            "yaw_smoothed": self._normalise_yaw(imu_position.yaw_smoothed),
+        }
+
         return {
             "started": self.started,
-            "imu_updating": self.imu.updating,
-            "imu_has_position": self.imu.has_position,
-            "imu_position_stable": self.imu.position_stable,
-            "mag_calibrated": self.imu.mag_calibrated,
-            "mpu_calibrated": self.imu.mpu_calibrated,
-            "imu_calibrated": self.imu.mag_calibrated and self.imu.mpu_calibrated,
-            "yaw": self.imu.yaw,
-            "yaw_smoothed": self._normalise_yaw(self.imu.yaw_smoothed),
-            "yaw_normalised": self._normalise_yaw(self.imu.yaw),
-            "roll": self.imu.roll,
-            "pitch": self.imu.pitch,
-
             "moving_to_target": self.moving_to_target,
             "target_found": self.target_found,
             "target_position_x": self.target_position_x,
             "target_position_y": self.target_position_y,
             "stepper_position": self.stepper.current_position % 360,
-            "mag_heading_raw": self.imu.mag_heading_raw + gps_position.declination,
-
-            "gps": gps
+            "gps": gps,
+            "imu": imu,
         }
 
     # IMU functions
+    def imu_configure(self):
+        with grpc.insecure_channel(IMU_SERVICE_ADDRESS) as channel:
+            stub = imu_pb2_grpc.ImuServiceStub(channel)
+            stub.Configure(imu_pb2.EmptyRequest())
+
     def imu_calibrate(self):
         """
         Calibrates the Mag and Accel/Gyro sensors
         """
-        self.imu.stop_updating()
+        self.imu_stop()
 
         # To calibrate the mag we need to move the sensor around.
         # The best we can do is just spin the motor as fast as we can during calibration
@@ -114,22 +127,42 @@ class Telescope(object):
         #
         # # The rest of the sensors (accel, gyro) must be calibrated while not moving
         # time.sleep(1)
-        self.imu.calibrate_mpu()
+        self.imu_calibrate_mpu()
 
         # Calibration function resets the sensors, so we need to reconfigure them
-        self.imu.configure()
+        self.imu_configure()
 
-        return {
-            "mbias": self.imu.mpu9250.mbias,
-            "magScale": self.imu.mpu9250.magScale,
-        }
+    def imu_calibrate_mag(self):
+        with grpc.insecure_channel(IMU_SERVICE_ADDRESS) as channel:
+            stub = imu_pb2_grpc.ImuServiceStub(channel)
+            return stub.CalibrateMag(imu_pb2.EmptyRequest())
+
+    def imu_calibrate_mpu(self):
+        with grpc.insecure_channel(IMU_SERVICE_ADDRESS) as channel:
+            stub = imu_pb2_grpc.ImuServiceStub(channel)
+            return stub.CalibrateMPU(imu_pb2.EmptyRequest())
 
     def imu_start(self):
-        return self.imu.start_updating()
+        with grpc.insecure_channel(IMU_SERVICE_ADDRESS) as channel:
+            stub = imu_pb2_grpc.ImuServiceStub(channel)
+            return stub.StartUpdating(imu_pb2.EmptyRequest())
 
     def imu_stop(self):
-        return self.imu.stop_updating()
+        with grpc.insecure_channel(IMU_SERVICE_ADDRESS) as channel:
+            stub = imu_pb2_grpc.ImuServiceStub(channel)
+            return stub.StopUpdating(imu_pb2.EmptyRequest())
 
+    def imu_status(self):
+        with grpc.insecure_channel(IMU_SERVICE_ADDRESS) as channel:
+            stub = imu_pb2_grpc.ImuServiceStub(channel)
+            return stub.GetStatus(imu_pb2.EmptyRequest())
+
+    def imu_position(self):
+        with grpc.insecure_channel(IMU_SERVICE_ADDRESS) as channel:
+            stub = imu_pb2_grpc.ImuServiceStub(channel)
+            return stub.GetPosition(imu_pb2.EmptyRequest())
+
+    # GPS Functions
     def gps_start(self):
         with grpc.insecure_channel(GPS_SERVICE_ADDRESS) as channel:
             stub = gps_pb2_grpc.GpsServiceStub(channel)
@@ -149,13 +182,6 @@ class Telescope(object):
         with grpc.insecure_channel(GPS_SERVICE_ADDRESS) as channel:
             stub = gps_pb2_grpc.GpsServiceStub(channel)
             return stub.GetPosition(gps_pb2.EmptyRequest())
-
-    def mag_calibrate(self):
-        self.imu.calibrate_mag()
-        return {
-            "magBias": self.imu.mpu9250.magBias,
-            "magScale": self.imu.mpu9250.magScale,
-        }
 
     def move_to_astronomical_object(self, object_name):
         if not object_name:
@@ -228,12 +254,12 @@ class Telescope(object):
         self.target_found = False
 
         while self.moving_to_target:
-            while not self.imu.position_stable:
+            while not self.imu_status().position_stable:
                 if not self.moving_to_target:
                     break  # Don't block cancellation requests
                 time.sleep(0.1)
 
-            mag_pos = self._normalise_yaw(self.imu.yaw_smoothed)
+            mag_pos = self._normalise_yaw(self.imu_position().yaw_smoothed)
             degrees = self.degrees_between_points(mag_pos, position)
 
             self.stepper.current_position = mag_pos

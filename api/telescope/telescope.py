@@ -7,12 +7,11 @@ import grpc
 import imu_pb2
 import imu_pb2_grpc
 from hardware.easydriver import EasyDriver
-from hardware.imu import IMU
 from skyfield.api import load
 from skyfield.toposlib import Topos
 
-GPS_SERVICE_ADDRESS = "localhost:50051"
-IMU_SERVICE_ADDRESS = "localhost:50052"
+GPS_SERVICE_ADDRESS = "gps-service:50000"
+IMU_SERVICE_ADDRESS = "imu-service:50000"
 
 IMU_STABILITY_THRESHOLD = 0.5  # @TODO: This currently matches the value in imu service. Need to make customisable.
 
@@ -21,18 +20,16 @@ class Telescope(object):
     def __init__(self):
         # Init hardware devices
         self.stepper = EasyDriver(
-            pin_step=4,
-            pin_direction=17,
-            pin_ms1=27,
-            pin_ms2=22,
-            pin_sleep=10,
-            pin_enable=9,
-            pin_reset=11,
+            pin_step=26,
+            pin_direction=19,
+            pin_ms1=6,
+            pin_ms2=5,
+            pin_sleep=13,
+            pin_enable=0,
+            #pin_reset=11,
             delay=0.001,
             gear_ratio=18,
         )
-
-        self.imu_configure()
 
         # Gear ratio of X axis gear system
         self.gear_ratio_x = 18  # to 18:1
@@ -46,6 +43,7 @@ class Telescope(object):
 
     def start(self):
         if not self.started:
+            self.imu_configure()
             self.imu_calibrate()
             self.imu_start()
             self.gps_start()

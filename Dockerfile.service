@@ -1,0 +1,13 @@
+FROM selexin/microservice-pydeps:latest
+
+WORKDIR /app
+
+COPY requirements.txt ./
+RUN pip3 install \
+	--no-cache-dir \
+	-i https://www.piwheels.org/simple \
+	-r requirements.txt
+
+COPY . .
+
+CMD [ "python3", "./server.py" ]

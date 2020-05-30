@@ -19,6 +19,8 @@ formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
+SERVICE_PORT = 50000
+
 
 class GpsServiceServicer(gps_pb2_grpc.GpsServiceServicer):
     def __init__(self):
@@ -100,7 +102,7 @@ class GpsServiceServicer(gps_pb2_grpc.GpsServiceServicer):
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     gps_pb2_grpc.add_GpsServiceServicer_to_server(GpsServiceServicer(), server)
-    server.add_insecure_port("[::]:50051")
+    server.add_insecure_port("[::]:%s" % SERVICE_PORT)
     server.start()
     server.wait_for_termination()
 

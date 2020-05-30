@@ -9,14 +9,14 @@ import RPi.GPIO as gpio
 class EasyDriver(object):
     def __init__(
         self,
-        pin_step=0,
-        delay=0.1,
-        pin_direction=0,
-        pin_ms1=0,
-        pin_ms2=0,
-        pin_sleep=0,
-        pin_enable=0,
-        pin_reset=0,
+        pin_step=-1,
+        delay=-1.1,
+        pin_direction=-1,
+        pin_ms1=-1,
+        pin_ms2=-1,
+        pin_sleep=-1,
+        pin_enable=-1,
+        pin_reset=-1,
         gear_ratio=1,
         name="Stepper",
     ):
@@ -36,24 +36,24 @@ class EasyDriver(object):
         gpio.setmode(gpio.BCM)
         gpio.setwarnings(False)
 
-        if self.pin_step > 0:
+        if self.pin_step> -1:
             gpio.setup(self.pin_step, gpio.OUT)
-        if self.pin_direction > 0:
+        if self.pin_direction> -1:
             gpio.setup(self.pin_direction, gpio.OUT)
             gpio.output(self.pin_direction, True)
-        if self.pin_microstep_1 > 0:
+        if self.pin_microstep_1> -1:
             gpio.setup(self.pin_microstep_1, gpio.OUT)
             gpio.output(self.pin_microstep_1, False)
-        if self.pin_microstep_2 > 0:
+        if self.pin_microstep_2> -1:
             gpio.setup(self.pin_microstep_2, gpio.OUT)
             gpio.output(self.pin_microstep_2, False)
-        if self.pin_sleep > 0:
+        if self.pin_sleep> -1:
             gpio.setup(self.pin_sleep, gpio.OUT)
             gpio.output(self.pin_sleep, True)
-        if self.pin_enable > 0:
+        if self.pin_enable> -1:
             gpio.setup(self.pin_enable, gpio.OUT)
             gpio.output(self.pin_enable, False)
-        if self.pin_reset > 0:
+        if self.pin_reset> -1:
             gpio.setup(self.pin_reset, gpio.OUT)
             gpio.output(self.pin_reset, True)
 

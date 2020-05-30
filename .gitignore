@@ -2,6 +2,6 @@
 venv
 cmake-build-debug
 __pycache__
-.pyc
+**.pyc
 gps_pb2*
 imu_pb2*

@@ -2,5 +2,8 @@
 docker stop gps-service imu-service
 docker rm gps-service
 docker rm imu-service
-#docker run --privileged -p 50051:50051 --name gps-service selexin/gps-service:latest
-docker run --privileged -p 50052:50052 --name imu-service selexin/imu-service:latest
+docker pull selexin/gps-service:latest
+docker pull selexin/imu-service:latest
+
+docker run -d --privileged -p 50051:50000 --name gps-service selexin/gps-service:latest
+docker run -d --privileged -p 50052:50000 --name imu-service selexin/imu-service:latest

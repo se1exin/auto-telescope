@@ -18,19 +18,18 @@ docker buildx create --use --name multiarch-builder
 # Make sure builder is running
 docker buildx inspect --bootstrap
 
-
 echo ""
 echo "====================================="
-echo "  Building grpcio deps for arm/v7"
+echo "  Building python deps for arm/v7"
 echo "====================================="
 echo " "
-docker buildx build . \
-	-f Dockerfile.grpcio \
-	-t selexin/grpcio:latest \
-	-t selexin/grpcio:1.28.1 \
+docker buildx build \
+	-t selexin/microservice-pydeps:latest \
 	--platform linux/arm/v7 \
-	--push
+	--push \
+	- < Dockerfile.pydeps
 
+exit 0
 
 echo ""
 echo "====================================="
@@ -38,7 +37,7 @@ echo "   Building GPS Service for arm/v7"
 echo "====================================="
 echo " "
 docker buildx build ./services/gps/ \
-	-f ./services/gps/Dockerfile \
+	-f ./Dockerfile.service \
 	-t selexin/gps-service:latest \
 	--platform linux/arm/v7 \
 	--push
@@ -49,8 +48,19 @@ echo "   Building IMU Service for arm/v7"
 echo "====================================="
 echo " "
 docker buildx build ./services/imu/ \
-	-f ./services/imu/Dockerfile \
+	-f ./Dockerfile.service \
 	-t selexin/imu-service:latest \
+	--platform linux/arm/v7 \
+	--push
+
+echo ""
+echo "====================================="
+echo "   Building API Service for arm/v7"
+echo "====================================="
+echo " "
+docker buildx build ./api/ \
+	-f ./Dockerfile.service \
+	-t selexin/api-service:latest \
 	--platform linux/arm/v7 \
 	--push
 

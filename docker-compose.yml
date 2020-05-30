@@ -1,0 +1,32 @@
+version: '2.0'
+services:
+  gps-service:
+    build:
+      context: ./services/gps/
+      dockerfile: ../../Dockerfile.service
+    image: gps-service
+    volumes:
+    - ./services/gps:/app
+    privileged: true
+  imu-service:
+    build:
+      context: ./services/imu/
+      dockerfile: ../../Dockerfile.service
+    image: imu-service
+    privileged: true
+    volumes:
+    - ./services/imu:/app
+  api-service:
+    build:
+      context: ./api/
+      dockerfile: ../Dockerfile.service
+    image: api-service
+    privileged: true
+    ports:
+    - "8080:8080"
+    volumes:
+    - ./api:/app
+    links:
+    - gps-service
+    - imu-service
+

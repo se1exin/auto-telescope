@@ -24,7 +24,7 @@ formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
-SERVICE_PORT = 50052
+SERVICE_PORT = 50000
 
 
 class ImuServiceServicer(imu_pb2_grpc.ImuServiceServicer):

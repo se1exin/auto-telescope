@@ -69,7 +69,7 @@ def stop_updating(stub):
 
 
 def run():
-    with grpc.insecure_channel("localhost:50051") as channel:
+    with grpc.insecure_channel("localhost:50052") as channel:
         stub = imu_pb2_grpc.ImuServiceStub(channel)
         print("-------------- GetStatus --------------")
         status = get_status(stub)

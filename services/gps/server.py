@@ -1,6 +1,7 @@
 import datetime
 import logging
 import threading
+import os
 from concurrent import futures
 
 import grpc
@@ -12,9 +13,9 @@ import pynmea2
 import serial
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(os.environ.get("LOG_LEVEL", logging.DEBUG))
 ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
+ch.setLevel(os.environ.get("LOG_LEVEL", logging.DEBUG))
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 ch.setFormatter(formatter)
 logger.addHandler(ch)

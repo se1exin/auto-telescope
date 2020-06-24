@@ -1,5 +1,47 @@
 version: '2.0'
 services:
+  stepper-x-service:
+    build:
+      context: ./services/easydriver/
+      dockerfile: ../../Dockerfile.service
+    image: stepper-x-service
+    volumes:
+    - ./services/easydriver:/app
+    privileged: true
+    environment:
+      - DELAY=0.001
+      - PIN_STEP=0
+      - PIN_DIRECTION=11
+      - PIN_MS1=19
+      - PIN_MS2=13
+      - PIN_MS3=6
+      - PIN_SLEEP=5
+      - PIN_ENABLE=26
+      - GEAR_RATIO=48
+      - NAME=X Axis
+      - LOG_LEVEL=INFO
+  stepper-y-service:
+    build:
+      context: ./services/easydriver/
+      dockerfile: ../../Dockerfile.service
+    image: stepper-y-service
+    volumes:
+    - ./services/easydriver:/app
+    privileged: true
+    environment:
+      - DELAY=0.001
+      - PIN_STEP=25
+      - PIN_DIRECTION=8
+      - PIN_MS1=24
+      - PIN_MS2=1
+      - PIN_SLEEP=23
+      - PIN_ENABLE=7
+      - GEAR_RATIO=21
+      - PIN_KILLSWITCH_LEFT=21
+      - PIN_KILLSWITCH_POWER=20
+      - PIN_KILLSWITCH_RIGHT=16
+      - NAME=Y Axis
+      - LOG_LEVEL=INFO
   gps-service:
     build:
       context: ./services/gps/
@@ -8,6 +50,8 @@ services:
     volumes:
     - ./services/gps:/app
     privileged: true
+    environment:
+      - LOG_LEVEL=INFO
   imu-service:
     build:
       context: ./services/imu/
@@ -16,6 +60,8 @@ services:
     privileged: true
     volumes:
     - ./services/imu:/app
+    environment:
+      - LOG_LEVEL=INFO
   api-service:
     build:
       context: ./api/
@@ -29,4 +75,6 @@ services:
     links:
     - gps-service
     - imu-service
+    - stepper-x-service
+    - stepper-y-service
 

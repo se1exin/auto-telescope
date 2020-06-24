@@ -5,3 +5,4 @@ __pycache__
 **.pyc
 gps_pb2*
 imu_pb2*
+easydriver_pb2*

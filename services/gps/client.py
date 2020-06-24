@@ -38,7 +38,7 @@ def stop_updating(stub):
 
 
 def run():
-    with grpc.insecure_channel("localhost:50051") as channel:
+    with grpc.insecure_channel("localhost:50000") as channel:
         stub = gps_pb2_grpc.GpsServiceStub(channel)
         print("-------------- GetStatus --------------")
         status = get_status(stub)

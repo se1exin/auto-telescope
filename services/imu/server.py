@@ -4,6 +4,7 @@ import threading
 import time
 from collections import deque
 from concurrent import futures
+import os
 
 import numpy
 
@@ -17,9 +18,9 @@ from mpu9250_jmdev.mpu_9250 import MPU9250
 from mpu9250_jmdev.registers import *
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(os.environ.get("LOG_LEVEL", logging.DEBUG))
 ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
+ch.setLevel(os.environ.get("LOG_LEVEL", logging.DEBUG))
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 ch.setFormatter(formatter)
 logger.addHandler(ch)

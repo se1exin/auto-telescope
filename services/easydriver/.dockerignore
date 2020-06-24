@@ -1,0 +1,7 @@
+venv
+__pycache__
+.pyc
+.swp
+client.py
+.idea
+Dockerfile

@@ -1,0 +1,66 @@
+// GPS Module Service Interface
+
+syntax = "proto3";
+
+package easydriver;
+
+option java_multiple_files = true;
+option java_package = "com.selexin.autotelescope";
+option java_outer_classname = "EasyDriverProto";
+
+service EasyDriverService {
+  // Disable the stepper controller
+  rpc Disable(EmptyRequest) returns (StatusResponse) {}
+
+  // Enable the stepper controller
+  rpc Enable(EmptyRequest) returns (StatusResponse) {}
+
+  // Put the stepper controller into sleep
+  rpc Sleep(EmptyRequest) returns (StatusResponse) {}
+
+  // Wake the stepper controller from sleep
+  rpc Wake(EmptyRequest) returns (StatusResponse) {}
+
+  // Reset the stepper controller
+  rpc Reset(EmptyRequest) returns (StatusResponse) {}
+
+  // Get the current estimated position and killswitch status of 
+  rpc GetStatus(EmptyRequest) returns (StatusResponse) {}
+
+  // Move the stepper one step forward
+  rpc StepForward(EmptyRequest) returns (PositionResponse) {}
+
+  // Move the stepper one step backwards
+  rpc StepReverse(EmptyRequest) returns (PositionResponse) {}
+
+  // Set the stepper step size
+  rpc SetFullStep(EmptyRequest) returns (EmptyResponse) {}
+
+  rpc SetHalfStep(EmptyRequest) returns (EmptyResponse) {}
+
+  rpc SetQuarterStep(EmptyRequest) returns (EmptyResponse) {}
+
+  rpc SetEighthStep(EmptyRequest) returns (EmptyResponse) {}
+
+  rpc SetSixteenthStep(EmptyRequest) returns (EmptyResponse) {}
+}
+
+message EmptyRequest {}
+message EmptyResponse {}
+
+message PositionResponse {
+  float current_position = 1;
+}
+
+message StatusResponse {
+  float current_position = 1;
+  bool direction = 2;
+  float degrees_per_step = 3;
+  bool enabled = 4;  
+  float gear_ratio = 5;
+  bool killswitch_left_on = 6;
+  bool killswitch_right_on = 7;
+  string name = 8;
+  bool sleeping = 9;
+  int32 steps_per_rev = 10;
+}

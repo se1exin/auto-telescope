@@ -4,6 +4,7 @@ Flask==1.1.2
 Flask-Cors==3.0.8
 Flask-SocketIO==4.3.0
 grpcio==1.28.1
+grpcio-tools==1.28.1
 itsdangerous==1.1.0
 Jinja2==2.11.2
 jplephem==2.14
@@ -12,7 +13,6 @@ numpy==1.18.4
 protobuf==3.11.3
 python-engineio==3.12.1
 python-socketio==4.5.1
-RPi.GPIO==0.7.0
 sgp4==2.8
 six==1.14.0
 skyfield==1.20

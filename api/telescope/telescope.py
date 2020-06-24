@@ -1,38 +1,28 @@
 import threading
 import time
 
-import gps_pb2
-import gps_pb2_grpc
-import grpc
-import imu_pb2
-import imu_pb2_grpc
-from hardware.easydriver import EasyDriver
 from skyfield.api import load
 from skyfield.toposlib import Topos
 
+from telescope.gps import GPS
+from telescope.imu import IMU
+from telescope.stepper import Stepper
+
 GPS_SERVICE_ADDRESS = "gps-service:50000"
 IMU_SERVICE_ADDRESS = "imu-service:50000"
+STEPPER_X_SERVICE_ADDRESS = "stepper-x-service:50000"
+STEPPER_Y_SERVICE_ADDRESS = "stepper-y-service:50000"
 
 IMU_STABILITY_THRESHOLD = 0.5  # @TODO: This currently matches the value in imu service. Need to make customisable.
 
 
 class Telescope(object):
     def __init__(self):
-        # Init hardware devices
-        self.stepper = EasyDriver(
-            pin_step=26,
-            pin_direction=19,
-            pin_ms1=6,
-            pin_ms2=5,
-            pin_sleep=13,
-            pin_enable=0,
-            #pin_reset=11,
-            delay=0.001,
-            gear_ratio=18,
-        )
+        self.gps = GPS(GPS_SERVICE_ADDRESS)
+        self.imu = IMU(IMU_SERVICE_ADDRESS)
+        self.stepper_x = Stepper(STEPPER_X_SERVICE_ADDRESS)
+        self.stepper_y = Stepper(STEPPER_Y_SERVICE_ADDRESS)
 
-        # Gear ratio of X axis gear system
-        self.gear_ratio_x = 18  # to 18:1
         self.moving_to_target = False
         self.target_found = False
         self.target_position_x = 0.0
@@ -43,20 +33,26 @@ class Telescope(object):
 
     def start(self):
         if not self.started:
-            self.imu_configure()
-            self.imu_calibrate()
-            self.imu_start()
-            self.gps_start()
-            self.stepper.disable()
+            self.imu.configure()
+            self.imu.calibrate()
+            self.imu.start()
+            self.gps.start()
+            self.stepper_x.wake()
+            self.stepper_y.wake()
+            self.stepper_x.disable()
+            self.stepper_y.disable()
             self.started = True
         return self.status()
 
     def status(self):
         # Overall status of all sensors and positions
-        gps_status = self.gps_status()
-        gps_position = self.gps_position()
-        imu_status = self.imu_status()
-        imu_position = self.imu_position()
+        gps_status = self.gps.status()
+        gps_position = self.gps.position()
+        imu_status = self.imu.status()
+        imu_position = self.imu.position()
+
+        stepper_x_status = self.stepper_x.status()
+        stepper_y_status = self.stepper_y.status()
 
         gps = {
             "latitude": gps_position.latitude,
@@ -84,102 +80,45 @@ class Telescope(object):
             "yaw_smoothed": self._normalise_yaw(imu_position.yaw_smoothed),
         }
 
+        stepper_x = {
+            "current_position": stepper_x_status.current_position,
+            "position_normalised": stepper_x_status.current_position % 360,
+            "direction": stepper_x_status.direction,
+            "degrees_per_step": stepper_x_status.degrees_per_step,
+            "enabled": stepper_x_status.enabled,
+            "gear_ratio": stepper_x_status.gear_ratio,
+            "killswitch_left_on": stepper_x_status.killswitch_left_on,
+            "killswitch_right_on": stepper_x_status.killswitch_right_on,
+            "name": stepper_x_status.name,
+            "sleeping": stepper_x_status.sleeping,
+            "steps_per_rev": stepper_x_status.steps_per_rev,
+        }
+
+        stepper_y = {
+            "current_position": stepper_y_status.current_position,
+            "position_normalised": stepper_y_status.current_position % 360,
+            "direction": stepper_y_status.direction,
+            "degrees_per_step": stepper_y_status.degrees_per_step,
+            "enabled": stepper_y_status.enabled,
+            "gear_ratio": stepper_y_status.gear_ratio,
+            "killswitch_left_on": stepper_y_status.killswitch_left_on,
+            "killswitch_right_on": stepper_y_status.killswitch_right_on,
+            "name": stepper_y_status.name,
+            "sleeping": stepper_y_status.sleeping,
+            "steps_per_rev": stepper_y_status.steps_per_rev,
+        }
+
         return {
             "started": self.started,
             "moving_to_target": self.moving_to_target,
             "target_found": self.target_found,
             "target_position_x": self.target_position_x,
             "target_position_y": self.target_position_y,
-            "stepper_position": self.stepper.current_position % 360,
             "gps": gps,
             "imu": imu,
+            "stepper_x": stepper_x,
+            "stepper_y": stepper_y
         }
-
-    # IMU functions
-    def imu_configure(self):
-        with grpc.insecure_channel(IMU_SERVICE_ADDRESS) as channel:
-            stub = imu_pb2_grpc.ImuServiceStub(channel)
-            stub.Configure(imu_pb2.EmptyRequest())
-
-    def imu_calibrate(self):
-        """
-        Calibrates the Mag and Accel/Gyro sensors
-        """
-        self.imu_stop()
-
-        # To calibrate the mag we need to move the sensor around.
-        # The best we can do is just spin the motor as fast as we can during calibration
-        # self.stepper.enable()
-        # self.stepper.set_full_step()
-        #
-        # # Start calibration in another thread so we can rotate the motor in this thread.
-        # x = threading.Thread(target=self.imu.calibrate_mag)
-        # x.start()
-        #
-        # while self.imu.is_calibrating_mag:
-        #     self.stepper.step_forward()
-        #     time.sleep(0.001)
-        #
-        # # Mag calibration complete
-        # self.stepper.disable()
-        #
-        # # The rest of the sensors (accel, gyro) must be calibrated while not moving
-        # time.sleep(1)
-        self.imu_calibrate_mpu()
-
-        # Calibration function resets the sensors, so we need to reconfigure them
-        self.imu_configure()
-
-    def imu_calibrate_mag(self):
-        with grpc.insecure_channel(IMU_SERVICE_ADDRESS) as channel:
-            stub = imu_pb2_grpc.ImuServiceStub(channel)
-            return stub.CalibrateMag(imu_pb2.EmptyRequest())
-
-    def imu_calibrate_mpu(self):
-        with grpc.insecure_channel(IMU_SERVICE_ADDRESS) as channel:
-            stub = imu_pb2_grpc.ImuServiceStub(channel)
-            return stub.CalibrateMPU(imu_pb2.EmptyRequest())
-
-    def imu_start(self):
-        with grpc.insecure_channel(IMU_SERVICE_ADDRESS) as channel:
-            stub = imu_pb2_grpc.ImuServiceStub(channel)
-            return stub.StartUpdating(imu_pb2.EmptyRequest())
-
-    def imu_stop(self):
-        with grpc.insecure_channel(IMU_SERVICE_ADDRESS) as channel:
-            stub = imu_pb2_grpc.ImuServiceStub(channel)
-            return stub.StopUpdating(imu_pb2.EmptyRequest())
-
-    def imu_status(self):
-        with grpc.insecure_channel(IMU_SERVICE_ADDRESS) as channel:
-            stub = imu_pb2_grpc.ImuServiceStub(channel)
-            return stub.GetStatus(imu_pb2.EmptyRequest())
-
-    def imu_position(self):
-        with grpc.insecure_channel(IMU_SERVICE_ADDRESS) as channel:
-            stub = imu_pb2_grpc.ImuServiceStub(channel)
-            return stub.GetPosition(imu_pb2.EmptyRequest())
-
-    # GPS Functions
-    def gps_start(self):
-        with grpc.insecure_channel(GPS_SERVICE_ADDRESS) as channel:
-            stub = gps_pb2_grpc.GpsServiceStub(channel)
-            stub.StartUpdating(gps_pb2.StartRequest(stop_when_found=True))
-
-    def gps_stop(self):
-        with grpc.insecure_channel(GPS_SERVICE_ADDRESS) as channel:
-            stub = gps_pb2_grpc.GpsServiceStub(channel)
-            stub.StopUpdating(gps_pb2.EmptyRequest())
-
-    def gps_status(self):
-        with grpc.insecure_channel(GPS_SERVICE_ADDRESS) as channel:
-            stub = gps_pb2_grpc.GpsServiceStub(channel)
-            return stub.GetStatus(gps_pb2.EmptyRequest())
-
-    def gps_position(self):
-        with grpc.insecure_channel(GPS_SERVICE_ADDRESS) as channel:
-            stub = gps_pb2_grpc.GpsServiceStub(channel)
-            return stub.GetPosition(gps_pb2.EmptyRequest())
 
     def move_to_astronomical_object(self, object_name):
         if not object_name:
@@ -188,7 +127,7 @@ class Telescope(object):
         if not self.started:
             raise Exception("Telescope has not been initialised.")
 
-        if not self.gps_status().has_position:
+        if not self.gps.status().has_position:
             raise Exception("Cannot target object without GPS position.")
 
         if self.moving_to_target:
@@ -201,7 +140,7 @@ class Telescope(object):
             planets = load("de421.bsp")
             earth, target_planet = planets["earth"], planets[object_name]
 
-            gps_position = self.gps_position()
+            gps_position = self.gps.position()
 
             current_pos = earth + Topos(
                 latitude_degrees=gps_position.latitude,
@@ -227,13 +166,15 @@ class Telescope(object):
         if method == "compass":
             return self.move_to_compass_position(position)
         else:
+            self.stepper_x.set_full_step()
+
             # Use the stepper step count rather than the compass to find the target
             result = self.move_to_compass_position(0)
             degrees = Telescope.degrees_between_points(
-                self.stepper.current_position, position
+                self.stepper_x.status().current_position, position
             )
             self.target_position_x = position
-            self.rotate_stepper_by_degrees(degrees, variable_speed=False)
+            self.rotate_stepper_by_degrees(self.stepper_x, degrees, variable_speed=False)
             return result
 
     def move_to_compass_position(
@@ -252,19 +193,19 @@ class Telescope(object):
         self.target_found = False
 
         while self.moving_to_target:
-            while not self.imu_status().position_stable:
+            while not self.imu.status().position_stable:
                 if not self.moving_to_target:
                     break  # Don't block cancellation requests
                 time.sleep(0.1)
 
-            mag_pos = self._normalise_yaw(self.imu_position().yaw_smoothed)
+            mag_pos = self._normalise_yaw(self.imu.position().yaw_smoothed)
             degrees = self.degrees_between_points(mag_pos, position)
 
-            self.stepper.current_position = mag_pos
+            self.stepper_x.current_position = mag_pos
 
             print("Are we there yet?", mag_pos, position, degrees, abs(degrees))
             if abs(degrees) > allowed_error_margin:
-                self.rotate_stepper_by_degrees(degrees)
+                self.rotate_stepper_by_degrees(self.stepper_x, degrees, variable_speed=False)
             else:
                 break
 
@@ -272,34 +213,38 @@ class Telescope(object):
         self.target_found = True
         return True
 
-    def rotate_stepper_by_degrees(self, degrees, variable_speed=True):
+    def rotate_stepper_by_degrees(self, stepper, degrees, variable_speed=True):
         degrees_abs = abs(degrees)
 
-        self.stepper.enable()
+        stepper.enable()
         # As the distance gets smaller, slow down the motor speed and time between rotation/stabilisation attempts
-        if degrees_abs < 15 or not variable_speed:
-            self.stepper.set_eighth_step()
-        elif degrees_abs < 60:
-            self.stepper.set_quarter_step()
-        elif degrees_abs < 90:
-            self.stepper.set_half_step()
-        else:
-            self.stepper.set_full_step()
+        if variable_speed:
+            if degrees_abs < 15:
+                stepper.set_eighth_step()
+            elif degrees_abs < 60:
+                stepper.set_quarter_step()
+            elif degrees_abs < 90:
+                stepper.set_half_step()
+            else:
+                stepper.set_full_step()
 
-        num_steps_required = degrees_abs / self.stepper.degrees_per_step()
+        num_steps_required = degrees_abs / stepper.status().degrees_per_step
 
         for i in range(0, int(num_steps_required)):
-            if degrees < 0:
-                self.stepper.step_reverse()
-            else:
-                self.stepper.step_forward()
+            if not self.moving_to_target:
+                break
 
-        self.stepper.disable()
+            if degrees < 0:
+                stepper.step_reverse()
+            else:
+                stepper.step_forward()
+
+        stepper.disable()
 
     def _normalise_yaw(self, yaw):
         # Yaw is from -180 to +180. 0 == North.
         # Convert to 0 -> 360 degrees
-        yaw += self.gps_position().declination
+        yaw += self.gps.position().declination
         if yaw < 0:
             return 360 - abs(yaw)
         return yaw

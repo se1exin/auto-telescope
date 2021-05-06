@@ -1,7 +1,7 @@
 certifi==2020.4.5.1
 click==7.1.2
 Flask==1.1.2
-Flask-Cors==3.0.8
+Flask-Cors==3.0.9
 Flask-SocketIO==4.3.0
 grpcio==1.28.1
 grpcio-tools==1.28.1

@@ -1,6 +1,6 @@
 grpcio==1.28.1
 grpcio-tools==1.28.1
-numpy==1.18.4
+numpy==1.22.0
 protobuf==3.11.3
 pyIGRF==0.3.1
 pynmea2==1.15.0

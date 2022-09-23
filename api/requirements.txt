@@ -10,7 +10,7 @@ Jinja2==2.11.3
 jplephem==2.14
 MarkupSafe==1.1.1
 numpy==1.18.4
-protobuf==3.11.3
+protobuf==3.18.3
 python-engineio==3.12.1
 python-socketio==4.5.1
 sgp4==2.8

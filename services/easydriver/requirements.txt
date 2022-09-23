@@ -1,5 +1,5 @@
 grpcio==1.28.1
 grpcio-tools==1.28.1
-protobuf==3.11.3
+protobuf==3.18.3
 RPi.GPIO==0.7.0
 six==1.15.0

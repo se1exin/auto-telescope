@@ -16,4 +16,4 @@ python-socketio==4.5.1
 sgp4==2.8
 six==1.14.0
 skyfield==1.20
-Werkzeug==1.0.1
+Werkzeug==2.2.3
